@@ -1,0 +1,84 @@
+{
+  "app_state": {
+    "activeProfile": "Default",
+    "profiles": {
+      "Default": {
+        "name": "Default",
+        "durations": {
+          "work": 25,
+          "short": 5,
+          "long": 15,
+          "longEvery": 4
+        },
+        "settings": {
+          "autoStart": false,
+          "notifOn": true,
+          "adaptiveOn": true,
+          "microGoalOn": true,
+          "autopsyOn": true,
+          "coachOn": false
+        },
+        "stats": {
+          "byDate": {
+            "2025-11-22": {
+              "focusSessions": 1,
+              "focusMinutes": 25
+            }
+          },
+          "autopsies": [
+            {
+              "date": "2025-11-22",
+              "reason": "phone",
+              "notes": "",
+              "mode": "work",
+              "minutes": 25
+            }
+          ],
+          "microGoals": [],
+          "shadow": {
+            "clockSec": 86,
+            "attentionSec": 74
+          },
+          "timeline": [
+            {
+              "t": "11/22/2025, 11:26:57 AM",
+              "mode": "work",
+              "minutes": 25,
+              "attention": 70,
+              "autopsy": "—"
+            }
+          ],
+          "tasks": []
+        }
+      }
+    },
+    "mode": "work",
+    "remainingSec": 1500,
+    "totalSec": 1500,
+    "running": false,
+    "cycleCount": 1,
+    "strictMode": false,
+    "strictOptions": {
+      "punishLeave": false,
+      "punishClicks": true,
+      "quizLock": false,
+      "hardLock": false
+    },
+    "blacklist": [
+      "instagram.com",
+      "tiktok.com",
+      "youtube.com",
+      "x.com"
+    ],
+    "theme": "forest",
+    "roomId": null,
+    "musicVolumes": [
+      0.55,
+      0.35,
+      0.25
+    ],
+    "pinnedTask": null,
+    "focusFull": false,
+    "clickPunish": false
+  }
+}

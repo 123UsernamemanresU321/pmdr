@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Ultra Pomodoro — X-Tier Edition (Dock UI)</title>
+
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0b0b10">
+  <style>
+    :root{
+      --radius: 18px; --radius-sm: 12px; --shadow: 0 12px 46px rgba(0,0,0,.45);
+      --font: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --trans: .18s ease;
+
+      --bg: #0b0b10; --bg-hi: #141423; --panel: #12121a; --panel-2:#171725;
+      --text:#eef0ff; --muted:#a8abc7; --accent:#8a6bff; --accent-2:#3be7c0;
+      --danger:#ff5c78; --warn:#ffcc66; --good:#7dff7a; --ring:#34344d;
+      --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.14);
+      --input: rgba(0,0,0,.35); --input-border: rgba(255,255,255,.14);
+      --btn: rgba(255,255,255,.08); --btn-border: rgba(255,255,255,.14);
+      --backdrop: rgba(0,0,0,.6);
+    }
+    html[data-theme="light"]{
+      --bg: #f5f6fb; --bg-hi: #ffffff; --panel: #ffffff; --panel-2:#f0f2fa;
+      --text:#15162b; --muted:#5f6484; --accent:#684dff; --accent-2:#00bfa5;
+      --danger:#e83d63; --warn:#e39b00; --good:#1bbf39; --ring:#e3e6f5;
+      --border: rgba(16,20,60,.08); --border-strong: rgba(16,20,60,.14);
+      --input: rgba(255,255,255,1); --input-border: rgba(16,20,60,.14);
+      --btn: rgba(16,20,60,.06); --btn-border: rgba(16,20,60,.14);
+      --shadow: 0 12px 40px rgba(14,16,60,.12); --backdrop: rgba(10,12,30,.35);
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; min-height:100vh; font-family:var(--font); color:var(--text);
+      background:
+        radial-gradient(1200px 800px at 12% -12%, color-mix(in oklab, var(--accent) 30%, transparent) 0%, transparent 60%),
+        radial-gradient(900px 700px at 110% 10%, color-mix(in oklab, var(--accent-2) 28%, transparent) 0%, transparent 60%),
+        radial-gradient(900px 700px at 40% 120%, color-mix(in oklab, var(--danger) 20%, transparent) 0%, transparent 60%),
+        var(--bg);
+      display:flex; flex-direction:column; transition: background var(--trans), color var(--trans);
+    }
+
+    header{
+      padding:14px clamp(14px,3vw,24px);
+      display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:50;
+      background: linear-gradient(180deg, color-mix(in oklab, var(--bg) 92%, transparent), color-mix(in oklab, var(--bg) 70%, transparent), transparent);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--border);
+    }
+    .brand{ display:flex; gap:10px; align-items:center; font-weight:950; letter-spacing:.4px; }
+    .brand .dot{
+      width:10px;height:10px;border-radius:50%;
+      background: conic-gradient(from 0deg, var(--accent), var(--accent-2), var(--accent));
+      box-shadow:0 0 14px var(--accent);
+    }
+    .tiny{ font-size:12px; color:var(--muted); font-weight:800; }
+
+    main{
+      width:min(980px,100%); margin:0 auto; padding: clamp(12px,3vw,24px);
+      display:grid; place-items:center; flex:1;
+    }
+
+    .card{
+      background: linear-gradient(180deg, color-mix(in oklab, var(--panel) 95%, transparent), var(--panel));
+      border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+
+    .timer-card{
+      width:100%;
+      padding:18px;
+      display:grid; grid-template-rows:auto 1fr auto auto auto; gap:12px; min-height:560px;
+    }
+
+    .mode-row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center; }
+
+    .chip{
+      padding:8px 12px; border-radius:999px; background: var(--btn); border:1px solid var(--btn-border);
+      color:var(--text); cursor:pointer; font-weight:900; font-size:14px; transition:var(--trans);
+    }
+    .chip.active{
+      background: color-mix(in oklab, var(--accent) 18%, transparent);
+      border-color: color-mix(in oklab, var(--accent) 70%, transparent);
+      box-shadow:0 0 0 2px color-mix(in oklab, var(--accent) 15%, transparent) inset, 0 0 18px color-mix(in oklab, var(--accent) 25%, transparent);
+    }
+
+    .timer-wrap{ display:grid; place-items:center; position:relative; padding:10px; }
+    .ring{
+      width:min(72vw,420px); aspect-ratio:1/1; display:grid; place-items:center; position:relative;
+      filter: drop-shadow(0 0 25px color-mix(in oklab, var(--accent) 18%, transparent));
+    }
+    .time-text{ position:absolute; inset:0; display:grid; place-items:center; text-align:center; pointer-events:none; }
+    .time{
+      font-size:clamp(38px,6vw,72px); font-weight:950; letter-spacing:1px; line-height:1;
+      font-variant-numeric: tabular-nums;
+    }
+    .label{
+      margin-top:6px; font-size:clamp(12px,2.1vw,14px); color:var(--muted); font-weight:900;
+      text-transform:uppercase; letter-spacing:1.2px;
+    }
+    .sub{ font-size:clamp(12px,2.3vw,14px); color:var(--muted); margin-top:8px; font-weight:800; }
+
+    .controls{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+
+    button, select, input, textarea{ font:inherit; color:inherit; }
+    .btn{
+      padding:10px 14px; border-radius:var(--radius-sm); border:1px solid var(--btn-border);
+      background: var(--btn); cursor:pointer; font-weight:900; transition:var(--trans);
+      display:inline-flex; gap:8px; align-items:center; justify-content:center;
+    }
+    .btn:hover{ transform:translateY(-1px); filter:saturate(1.05); }
+    .btn.primary{
+      background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 75%, #000));
+      border-color: color-mix(in oklab, var(--accent) 85%, transparent);
+      box-shadow:0 8px 22px color-mix(in oklab, var(--accent) 50%, transparent);
+      color:white;
+    }
+    .btn.ghost{ background:transparent; }
+    .btn.danger{ background: color-mix(in oklab, var(--danger) 12%, transparent); border-color: color-mix(in oklab, var(--danger) 60%, transparent); }
+    .btn.good{ background: color-mix(in oklab, var(--accent-2) 12%, transparent); border-color: color-mix(in oklab, var(--accent-2) 60%, transparent); }
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .muted{ color:var(--muted); font-size:14px; font-weight:800; }
+    .tinyline{ font-size:12px; color:var(--muted); font-weight:800; }
+    .divider{ height:1px; background: var(--border); margin:8px 0; }
+
+    .field{ display:grid; gap:4px; font-size:14px; font-weight:900; }
+    .field input, .field select, .field textarea{
+      background: var(--input); border:1px solid var(--input-border);
+      border-radius:10px; padding:8px 10px; outline:none; font-weight:900;
+    }
+    .field textarea{ min-height:60px; resize:vertical; }
+    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    @media (max-width:520px){ .grid2{ grid-template-columns:1fr; } }
+
+    .pill{
+      padding:6px 9px; border-radius:999px; font-weight:900; font-size:12px;
+      background: var(--btn); border:1px solid var(--btn-border);
+    }
+
+    /* QUICK TOGGLES */
+    .quickbar{
+      display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+      padding:8px; border:1px dashed var(--border); border-radius:14px;
+      background: color-mix(in oklab, var(--panel-2) 65%, transparent);
+    }
+    .toggle{
+      display:flex; gap:6px; align-items:center; font-weight:900; font-size:13px;
+      border:1px solid var(--btn-border); background:var(--btn); padding:6px 9px; border-radius:999px; cursor:pointer;
+    }
+    .toggle[data-on="true"]{ border-color: color-mix(in oklab, var(--good) 70%, transparent); box-shadow:0 0 0 2px color-mix(in oklab, var(--good) 18%, transparent) inset; }
+    .toggle small{ color:var(--muted); font-weight:800; }
+
+    /* BOTTOM DOCK */
+    .dock{
+      position:sticky; bottom:0; z-index:60;
+      background: color-mix(in oklab, var(--panel) 95%, transparent);
+      border-top:1px solid var(--border);
+      padding:8px clamp(10px,3vw,18px);
+      display:flex; justify-content:space-around; gap:8px;
+      backdrop-filter: blur(8px);
+    }
+    .dock-btn{
+      flex:1; max-width:120px;
+      display:grid; place-items:center; gap:2px;
+      padding:8px 6px; border-radius:12px; cursor:pointer;
+      font-weight:950; font-size:12px;
+      border:1px solid transparent;
+      transition:var(--trans);
+    }
+    .dock-btn.active{
+      background: color-mix(in oklab, var(--accent) 12%, transparent);
+      border-color: color-mix(in oklab, var(--accent) 60%, transparent);
+    }
+    .dock-btn .ico{ font-size:18px; }
+    .dock-btn .lbl{ color:var(--muted); }
+
+    /* DRAWER PANEL */
+    .backdrop{ position:fixed; inset:0; background:var(--backdrop); display:none; z-index:9000; backdrop-filter: blur(4px); }
+    .backdrop.show{ display:block; }
+    .drawer{
+      position:fixed; left:50%; bottom:-5px; transform:translateX(-50%);
+      width:min(980px,100vw); max-height:78vh; overflow:auto;
+      background:var(--panel); border:1px solid var(--border-strong); border-radius:18px 18px 0 0;
+      box-shadow:var(--shadow); z-index:9001;
+      display:none; padding:10px 12px 16px;
+    }
+    .drawer.show{ display:block; animation: slideUp .2s ease; }
+    @keyframes slideUp{ from{ transform:translate(-50%, 12px); opacity:.7;} to{ transform:translate(-50%,0); opacity:1;} }
+
+    .drawer-header{
+      position:sticky; top:0; background:var(--panel);
+      display:flex; justify-content:space-between; align-items:center;
+      padding:6px 2px 8px; border-bottom:1px solid var(--border); z-index:1;
+    }
+    .drawer-title{ font-size:16px; font-weight:950; }
+    .section{
+      margin-top:10px;
+      padding:12px; border-radius:14px; background: var(--panel-2);
+      border:1px solid var(--border); display:grid; gap:10px;
+    }
+
+    /* COMMAND PALETTE */
+    .palette{
+      position:fixed; inset:0; display:none; place-items:center; z-index:9999; background:rgba(0,0,0,.75);
+      backdrop-filter: blur(6px);
+    }
+    .palette.show{ display:grid; }
+    .palette-box{
+      width:min(640px,95vw); background:var(--panel); border:1px solid var(--border);
+      border-radius:16px; padding:10px; display:grid; gap:8px; box-shadow:var(--shadow);
+    }
+    .palette-input{
+      width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--input-border);
+      background:var(--input); font-weight:950;
+    }
+    .palette-list{ max-height:45vh; overflow:auto; display:grid; gap:6px; }
+    .palette-item{
+      padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:900; border:1px solid transparent;
+      background: color-mix(in oklab, var(--panel-2) 75%, transparent);
+    }
+    .palette-item:hover{ border-color:var(--border-strong); }
+
+    /* STRICT LOCK OVERLAY */
+    .overlay{
+      position:fixed; inset:0; background:rgba(5,5,9,.92);
+      display:none; place-items:center; z-index:99999; padding:18px;
+    }
+    .overlay.show{ display:grid; }
+    .lockbox{
+      width:min(560px,100%); background: var(--panel); border:1px solid var(--border);
+      border-radius:16px; padding:16px; box-shadow:var(--shadow); display:grid; gap:10px;
+    }
+    .lockbox h2{ margin:0; font-size:20px; font-weight:950; }
+    .lockbox .big{ font-size:28px; font-weight:950; color:var(--warn); letter-spacing:.5px; }
+    .shake{ animation: shake .35s linear; }
+    @keyframes shake{
+      0%{ transform:translateX(0); } 20%{ transform:translateX(-6px); } 40%{ transform:translateX(6px); }
+      60%{ transform:translateX(-4px); } 80%{ transform:translateX(4px); } 100%{ transform:translateX(0); }
+    }
+
+    /* TOAST */
+    .toast{
+      position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+      background: color-mix(in oklab, var(--panel) 92%, transparent);
+      border:1px solid var(--border-strong);
+      padding:10px 12px; border-radius:12px; font-size:14px;
+      display:none; z-index:999999; font-weight:950;
+    }
+    .toast.show{ display:block; }
+
+    canvas{ width:100%; height:240px; background:rgba(0,0,0,.08); border-radius:12px; border:1px solid var(--border); }
+    .bar{ height:10px; border-radius:999px; background:var(--ring); overflow:hidden; }
+    .bar > div{ height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); width:0%; transition:.4s; }
+
+    .tag{ font-size:12px; font-weight:900; color:var(--muted); }
+    .kbd{ font-family:var(--mono); font-size:12px; padding:2px 6px; border-radius:6px; background:var(--btn); border:1px solid var(--btn-border); }
+
+    .heat{ display:grid; grid-template-columns:repeat(12,1fr); gap:4px; }
+    .heat div{ height:16px; border-radius:4px; background:var(--btn); border:1px solid var(--btn-border); }
+  </style>
+</head>
+
+<body>
+<header>
+  <div class="brand">
+    <div class="dot"></div>
+    <div>
+      Ultra Pomodoro
+      <div class="tiny">Dock UI • Ctrl/⌘K Palette • No Sidebar</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="paletteBtn" class="btn ghost">⌘K Palette</button>
+    <button id="themeToggleBtn" class="btn ghost">🌙 Dark</button>
+  </div>
+</header>
+
+<main>
+  <section class="card timer-card">
+    <div class="mode-row" id="modeRow"></div>
+
+    <div class="timer-wrap">
+      <div class="ring">
+        <svg id="ringSvg" viewBox="0 0 100 100" width="100%" height="100%">
+          <defs>
+            <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" />
+              <stop offset="100%" stop-color="var(--accent-2)" />
+            </linearGradient>
+          </defs>
+          <circle cx="50" cy="50" r="44" fill="none" stroke="var(--ring)" stroke-width="8" />
+          <circle id="ringActive" cx="50" cy="50" r="44" fill="none"
+                  stroke="url(#grad)" stroke-width="8"
+                  stroke-linecap="round"
+                  stroke-dasharray="276.46" stroke-dashoffset="276.46"
+                  transform="rotate(-90 50 50)"/>
+        </svg>
+
+        <div class="time-text">
+          <div>
+            <div class="time" id="timeLeft">25:00</div>
+            <div class="label" id="modeLabel">Focus</div>
+            <div class="sub" id="subLine">Session 1 of 4 • Profile: Default</div>
+            <div class="sub" id="riskLine"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="startBtn" class="btn primary">▶ Start</button>
+      <button id="pauseBtn" class="btn ghost">⏸ Pause</button>
+      <button id="skipBtn" class="btn ghost">⏭ Skip</button>
+      <button id="resetBtn" class="btn danger">↺ Reset</button>
+    </div>
+
+    <div class="row muted" style="justify-content:center;">
+      <span id="statusText">Ready.</span>
+    </div>
+
+    <div class="row muted" style="justify-content:center;">
+      <span id="goalText"></span>
+    </div>
+
+    <!-- QUICK TOGGLES -->
+    <div class="quickbar" id="quickbar">
+      <div class="toggle" id="qtStrict" data-on="false">🔒 Strict <small id="qtStrictS">Off</small></div>
+      <div class="toggle" id="qtBlock" data-on="false">🚫 Block <small id="qtBlockS">Off</small></div>
+      <div class="toggle" id="qtDebt" data-on="true">🧾 Debt <small id="qtDebtS">On</small></div>
+      <div class="toggle" id="qtWeather">🌤 Check-in</div>
+      <div class="toggle" id="qtBiome">🌱 Biome</div>
+    </div>
+  </section>
+</main>
+
+<!-- BOTTOM DOCK -->
+<nav class="dock" id="dock">
+  <div class="dock-btn" data-panel="profiles"><div class="ico">👤</div><div class="lbl">Profiles</div></div>
+  <div class="dock-btn" data-panel="timer"><div class="ico">🎛️</div><div class="lbl">Timer</div></div>
+  <div class="dock-btn" data-panel="strict"><div class="ico">🔒</div><div class="lbl">Strict</div></div>
+  <div class="dock-btn" data-panel="block"><div class="ico">🚫</div><div class="lbl">Blocking</div></div>
+  <div class="dock-btn" data-panel="biome"><div class="ico">🌱</div><div class="lbl">Biome</div></div>
+  <div class="dock-btn" data-panel="weather"><div class="ico">🌤</div><div class="lbl">Weather</div></div>
+  <div class="dock-btn" data-panel="forensics"><div class="ico">🧯</div><div class="lbl">Forensics</div></div>
+  <div class="dock-btn" data-panel="analytics"><div class="ico">📊</div><div class="lbl">Analytics</div></div>
+  <div class="dock-btn" data-panel="tools"><div class="ico">🧪</div><div class="lbl">Tools</div></div>
+</nav>
+
+<div class="backdrop" id="drawerBackdrop"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title" id="drawerTitle">Panel</div>
+    <div class="row">
+      <button id="drawerClose" class="btn ghost">Close</button>
+    </div>
+  </div>
+  <div id="drawerBody"></div>
+</div>
+
+<!-- COMMAND PALETTE -->
+<div class="palette" id="palette">
+  <div class="palette-box">
+    <input id="paletteInput" class="palette-input" placeholder="Type a command or panel name..." />
+    <div class="palette-list" id="paletteList"></div>
+    <div class="tinyline">Navigate: ↑↓ Enter Esc. Examples: “strict on”, “biome quests”, “weekly report”.</div>
+  </div>
+</div>
+
+<!-- STRICT LOCK -->
+<div class="overlay" id="lockOverlay">
+  <div class="lockbox" id="lockModal">
+    <h2>Strict Mode Triggered</h2>
+    <div class="big" id="lockReason">You tried to escape focus.</div>
+    <div class="muted">Type the phrase below to continue.</div>
+    <div class="pill" id="lockPhraseShow"></div>
+    <input id="lockInput" placeholder="type phrase exactly" />
+    <div class="row" style="justify-content:flex-end;">
+      <button class="btn primary" id="lockSubmit">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// -------------------- Socket.IO client auto-loader --------------------
+(async function loadSocketIOClient(){
+  function loadScript(src){
+    return new Promise((resolve,reject)=>{
+      const s=document.createElement("script");
+      s.src=src;
+      s.onload=resolve;
+      s.onerror=reject;
+      document.head.appendChild(s);
+    });
+  }
+  try{
+    await loadScript("/socket.io/socket.io.js");
+    console.log("Socket.IO loaded from server");
+    return;
+  }catch(e){
+    console.warn("Local Socket.IO not found, falling back to CDN");
+  }
+  try{
+    await loadScript("https://cdn.socket.io/4.7.5/socket.io.min.js");
+    console.log("Socket.IO loaded from CDN");
+  }catch(e){
+    console.error("Failed to load Socket.IO client", e);
+  }
+})();
+
+(() => {
+  const MODES = [
+    { id:"work", label:"Focus", icon:"🎯" },
+    { id:"short", label:"Short Break", icon:"☕" },
+    { id:"long", label:"Long Break", icon:"🌿" }
+  ];
+  const autopsyReasons = [
+    "Got distracted by phone","Opened a blacklisted site","Too tired / low energy","Task unclear",
+    "Unexpected interruption","Over-ambitious goal","Anxiety / stress spike","Environment too noisy"
+  ];
+  const microChallenges = [
+    "30s box breathing","10 slow squats","Drink water","Posture reset",
+    "Look 20m away for 20s","Neck/shoulder roll","Cold splash (if possible)","2-minute walk",
+    "Write next step only","Set a 1-sentence intention"
+  ];
+  const biomeStages = ["🌱","🌿","🌳","🌲","🍄","🪸","🦠","🌸","🔥","🪐"];
+  const biomeTypes = [
+    {id:"forest", name:"Forest", emoji:"🌳", perks:"Stable growth; penalties hurt more"},
+    {id:"reef", name:"Reef", emoji:"🪸", perks:"Breaks give bonus XP"},
+    {id:"fungus", name:"Fungus", emoji:"🍄", perks:"Recovers fast after skips"},
+    {id:"nebula", name:"Nebula", emoji:"🪐", perks:"Deep work gives rare drops"}
+  ];
+  const biomeRelics = [
+    {id:"seed", name:"Focus Seed", cost:1, effect:"+3% XP next 5 sessions"},
+    {id:"shield", name:"Distraction Shield", cost:2, effect:"First penalty/day ignored"},
+    {id:"lens", name:"Clarity Lens", cost:2, effect:"+1 Clarity Weather once/day"},
+    {id:"totem", name:"Streak Totem", cost:3, effect:"Streak loss protection once/week"}
+  ];
+
+  const STORAGE_KEY = "ultraPomodoroStateV10Dock";
+  const $ = s => document.querySelector(s);
+
+  function defaultProfile(name="Default"){
+    return {
+      id: crypto.randomUUID(),
+      name,
+
+      durations: { work:25, short:5, long:15 },
+      longEvery: 4,
+      autoStart: true,
+      adaptiveOn: true,
+
+      microGoalOn: true,
+      lastGoal: "",
+      autopsyOn: true,
+
+      strictOn: false,
+      punishTab: "penalty",
+      punishClicks: "lockout",
+      penaltySec: 45,
+      lockPhrase: "stay focused",
+      strictFeatures: ["tab","clicks","idle","escape"],
+
+      blockOn: false,
+      blockMode: "blacklist",
+      annoyOn: true,
+      domains: ["instagram.com","tiktok.com"],
+
+      stats: {
+        focusCompleted:0,
+        breaksCompleted:0,
+        shadowAttention:0,
+        byDate:{},
+        autopsies:[],
+        penaltiesByDate:{},
+        replay:[],
+        weatherByDate:{},
+        hourRisks:{} // Fingerprint heatmap
+      },
+
+      companionOn:false,
+      roomId:"",
+      contract:{expectations:"", checkins:0, sharedStreak:0},
+
+      biome:{
+        name:"Biome",
+        type:"forest",
+        level:1,
+        xp:0,
+        drops:[],
+        orbs:0,
+        health:100,
+        relics:[],
+        quests:{date:"", list:[], done:0},
+        buffs:{xpBoostLeft:0, freePenaltyToday:false}
+      },
+
+      distractionLog:[],
+      focusDebtSec:0,
+      debtOn:true,
+      debtRate:0.6,
+      debtInterest:0.03,      // grows if unpaid
+      debtPayoffMode:"split", // split | frontload
+
+      handoffNotes:[],        // now checklists
+      futureSelfMsgs:[],
+      microChallengesOn:true,
+      microChallengePool:[...microChallenges],
+      microStreak:0,
+      microMaxStreak:0,
+
+      planCountermovesOn:true
+    };
+  }
+
+  function defaultState(){
+    return {
+      theme: document.documentElement.getAttribute("data-theme") || "dark",
+      profiles:[ defaultProfile() ],
+      activeProfileId: null,
+      timer: {
+        mode:"work",
+        cycle:1,
+        isRunning:false,
+        remainingSec: 25*60,
+        plannedSec: 25*60,
+        lastTick: null
+      }
+    };
+  }
+
+  function migrateProfile(p){
+    const dp=defaultProfile(p.name||"Default");
+    return {
+      ...dp, ...p,
+      durations:{...dp.durations, ...(p.durations||{})},
+      stats:{...dp.stats, ...(p.stats||{})},
+      biome:{...dp.biome, ...(p.biome||{})},
+      contract:{...dp.contract, ...(p.contract||{})},
+      microChallengePool: p.microChallengePool || dp.microChallengePool
+    };
+  }
+
+  function loadState(rawOverride){
+    try{
+      const raw = rawOverride || localStorage.getItem(STORAGE_KEY);
+      if(!raw) return defaultState();
+      const s = typeof raw==="string" ? JSON.parse(raw) : raw;
+      if(!s.profiles || !s.timer) return defaultState();
+      s.profiles = s.profiles.map(migrateProfile);
+      if(!s.activeProfileId) s.activeProfileId=s.profiles[0].id;
+      return s;
+    }catch{ return defaultState(); }
+  }
+  function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+  let state = loadState();
+  if(!state.activeProfileId) state.activeProfileId = state.profiles[0].id;
+  function activeProfile(){ return state.profiles.find(p=>p.id===state.activeProfileId) || state.profiles[0]; }
+
+  /* DOM */
+  const modeRow=$("#modeRow"), timeLeft=$("#timeLeft"), modeLabel=$("#modeLabel"), subLine=$("#subLine"),
+        ringActive=$("#ringActive"), statusText=$("#statusText"), goalText=$("#goalText"),
+        riskLine=$("#riskLine");
+
+  const startBtn=$("#startBtn"), pauseBtn=$("#pauseBtn"), skipBtn=$("#skipBtn"), resetBtn=$("#resetBtn");
+
+  const themeToggleBtn=$("#themeToggleBtn");
+  const paletteBtn=$("#paletteBtn");
+  const toastEl=$("#toast");
+
+  const dock=$("#dock"), drawerBackdrop=$("#drawerBackdrop"), drawer=$("#drawer"),
+        drawerTitle=$("#drawerTitle"), drawerBody=$("#drawerBody"), drawerClose=$("#drawerClose");
+
+  const palette=$("#palette"), paletteInput=$("#paletteInput"), paletteList=$("#paletteList");
+
+  const lockOverlay=$("#lockOverlay"), lockReason=$("#lockReason"), lockPhraseShow=$("#lockPhraseShow"),
+        lockInput=$("#lockInput"), lockSubmit=$("#lockSubmit"), lockModal=$("#lockModal");
+
+  const qtStrict=$("#qtStrict"), qtBlock=$("#qtBlock"), qtDebt=$("#qtDebt"),
+        qtWeather=$("#qtWeather"), qtBiome=$("#qtBiome"),
+        qtStrictS=$("#qtStrictS"), qtBlockS=$("#qtBlockS"), qtDebtS=$("#qtDebtS");
+
+  /* Theme */
+  function applyTheme(t){
+    document.documentElement.setAttribute("data-theme", t);
+    themeToggleBtn.textContent = t==="dark" ? "🌙 Dark" : "☀️ Light";
+  }
+  state.theme ||= "dark"; applyTheme(state.theme);
+  themeToggleBtn.onclick=()=>{ state.theme=(state.theme==="dark")?"light":"dark"; applyTheme(state.theme); saveState(); };
+
+  /* Toast */
+  let toastT=null;
+  function toast(msg){
+    toastEl.textContent=msg; toastEl.classList.add("show");
+    clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove("show"),2000);
+  }
+
+  /* Timer core */
+  const FULL_DASH = 2*Math.PI*44;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const format=sec=>{
+    sec=Math.max(0,Math.round(sec));
+    const m=Math.floor(sec/60), s=sec%60;
+    return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  };
+  function setRingProgress(r){ ringActive.style.strokeDasharray=FULL_DASH; ringActive.style.strokeDashoffset=FULL_DASH*(1-r); }
+
+  function plannedSecFor(mode){ return activeProfile().durations[mode]*60; }
+
+  function ambientPhase(){
+    const t=state.timer;
+    const ratio=t.remainingSec/t.plannedSec;
+    const p=activeProfile();
+    const today=new Date().toISOString().slice(0,10);
+    const w=p.stats.weatherByDate[today];
+    const mood=w? (w.mood/w.count):3;
+    const tint = ratio*0.8 + (mood-3)*0.05;
+    document.body.style.filter = `saturate(${1+tint}) contrast(${1+0.1*(1-ratio)})`;
+  }
+
+  function currentHourRisk(){
+    const p=activeProfile();
+    const h=new Date().getHours();
+    const r=p.stats.hourRisks[h]||{pen:0,skips:0};
+    const score = r.pen*2 + r.skips*3;
+    if(score>=6) return {label:"HIGH RISK HOUR", color:"var(--danger)"};
+    if(score>=3) return {label:"MEDIUM RISK HOUR", color:"var(--warn)"};
+    return {label:"Low risk hour", color:"var(--muted)"};
+  }
+
+  function renderTimer(){
+    const t=state.timer, p=activeProfile();
+    setRingProgress(t.remainingSec/t.plannedSec);
+    timeLeft.textContent=format(t.remainingSec);
+    modeLabel.textContent=MODES.find(x=>x.id===t.mode)?.label||"Focus";
+    subLine.textContent=`Session ${t.cycle} of ${p.longEvery} • Profile: ${p.name}`;
+    statusText.textContent=t.isRunning ? "Running…" : "Paused / Ready";
+    [...modeRow.children].forEach(ch=>ch.classList.toggle("active", ch.dataset.mode===t.mode));
+    ambientPhase();
+    renderQuickbar();
+
+    const hr=currentHourRisk();
+    riskLine.textContent = hr.label;
+    riskLine.style.color = hr.color;
+  }
+
+  function buildModes(){
+    modeRow.innerHTML="";
+    MODES.forEach(m=>{
+      const b=document.createElement("button");
+      b.className="chip";
+      b.textContent=`${m.icon} ${m.label}`;
+      b.dataset.mode=m.id;
+      b.onclick=()=>setMode(m.id,true);
+      modeRow.appendChild(b);
+    });
+  }
+
+  function setMode(mode, resetRemaining=false){
+    if(raf){ cancelAnimationFrame(raf); raf=null; }
+    state.timer.mode=mode;
+    if(resetRemaining){
+      const ps=plannedSecFor(mode);
+      state.timer.plannedSec=ps;
+      state.timer.remainingSec=ps;
+    }
+    state.timer.isRunning=false; state.timer.lastTick=null;
+    saveState(); renderTimer();
+  }
+
+  /* Weather -> circadian model */
+  function circadianBucket(h){
+    if(h<9) return "morning";
+    if(h<14) return "midday";
+    if(h<19) return "afternoon";
+    return "evening";
+  }
+  function circadianProfile(){
+    const p=activeProfile();
+    const buckets={morning:[],midday:[],afternoon:[],evening:[]};
+    for(const [d,w] of Object.entries(p.stats.weatherByDate)){
+      const hh=(w.lastHour ?? 12);
+      buckets[circadianBucket(hh)].push((w.energy+w.mood+w.clarity)/(3*w.count));
+    }
+    const avg=b=>b.length? b.reduce((a,c)=>a+c,0)/b.length : 0;
+    return {
+      morning:avg(buckets.morning),
+      midday:avg(buckets.midday),
+      afternoon:avg(buckets.afternoon),
+      evening:avg(buckets.evening)
+    };
+  }
+
+  function adaptiveDurations(){
+    const p=activeProfile();
+    if(!p.adaptiveOn) return;
+
+    const today=new Date().toISOString().slice(0,10);
+    const w=p.stats.weatherByDate[today];
+    const avgWeather = w ? (w.energy+w.mood+w.clarity)/(3*w.count):3;
+    const fatigue = clamp(Math.round((3.2-avgWeather)*2),0,3);
+
+    p.durations.work = clamp(p.durations.work - fatigue, 12, 90);
+    p.durations.short = clamp(p.durations.short + Math.floor(fatigue/2), 3, 30);
+    p.durations.long = clamp(p.durations.long + fatigue, 8, 60);
+  }
+
+  function incrementByDate(){
+    const p=activeProfile();
+    const d=new Date().toISOString().slice(0,10);
+    p.stats.byDate[d]=(p.stats.byDate[d]||0)+1;
+  }
+
+  function incrementPenalty(type){
+    const p=activeProfile();
+    const d=new Date().toISOString().slice(0,10);
+    p.stats.penaltiesByDate[d]=(p.stats.penaltiesByDate[d]||0)+1;
+    p.distractionLog.push({date:new Date().toISOString(), type});
+
+    const h=new Date().getHours();
+    p.stats.hourRisks[h] ||= {pen:0,skips:0};
+    p.stats.hourRisks[h].pen++;
+
+    p.stats.replay.push({ts:new Date().toISOString(), event:`penalty:${type}`});
+  }
+
+  /* Biome upgrades */
+  function biomeQuestSeed(){
+    return [
+      {id:"q_focus3", text:"Complete 3 Focus sessions", target:3, type:"focus"},
+      {id:"q_zero_pen", text:"Zero penalties today", target:0, type:"pen"},
+      {id:"q_weather2", text:"Log Weather twice", target:2, type:"weather"},
+      {id:"q_handoff2", text:"Write 2 handoff steps", target:2, type:"handoff"}
+    ];
+  }
+  function refreshQuestsIfNeeded(){
+    const p=activeProfile();
+    const d=new Date().toISOString().slice(0,10);
+    if(p.biome.quests.date!==d){
+      p.biome.quests={date:d, list:biomeQuestSeed().sort(()=>Math.random()-0.5).slice(0,3), done:0};
+    }
+  }
+
+  function applyBiomeGain(mins, fromBreak=false){
+    const p=activeProfile();
+    let gain = mins*6;
+    const bt=p.biome.type;
+    if(fromBreak && bt==="reef") gain*=1.25;
+
+    if(p.biome.buffs.xpBoostLeft>0){
+      gain*=1.03;
+      p.biome.buffs.xpBoostLeft--;
+    }
+
+    p.biome.xp += gain;
+    while(p.biome.xp >= p.biome.level*300){
+      p.biome.xp -= p.biome.level*300;
+      p.biome.level++;
+      p.biome.orbs++;
+      if(Math.random()<0.25){
+        const relic=biomeRelics[Math.floor(Math.random()*biomeRelics.length)];
+        p.biome.drops.push({date:new Date().toISOString(), item:"Relic Drop: "+relic.name});
+        p.biome.relics.push(relic.id);
+      }
+    }
+
+    p.biome.health = clamp(p.biome.health + (fromBreak?1:0.5), 0, 100);
+  }
+
+  function biomeEmojiFor(){
+    const p=activeProfile();
+    const base = biomeTypes.find(x=>x.id===p.biome.type)?.emoji || "🌱";
+    const stage = biomeStages[Math.min(biomeStages.length-1, Math.floor(p.biome.level/2))];
+    return (p.biome.level>=4)?stage:base;
+  }
+
+  function updateQuestProgress(){
+    const p=activeProfile();
+    refreshQuestsIfNeeded();
+    const d=new Date().toISOString().slice(0,10);
+    const focusCount=p.stats.byDate[d]||0;
+    const penCount=p.stats.penaltiesByDate[d]||0;
+    const w=p.stats.weatherByDate[d]; const wCount=w?w.count:0;
+    const handCount=p.handoffNotes.filter(x=>x.date.startsWith(d)).length;
+
+    let done=0;
+    const list=p.biome.quests.list.map(q=>{
+      let prog=0;
+      if(q.type==="focus") prog=focusCount;
+      if(q.type==="pen") prog=penCount;
+      if(q.type==="weather") prog=wCount;
+      if(q.type==="handoff") prog=handCount;
+      const complete = q.type==="pen" ? prog===0 : prog>=q.target;
+      if(complete) done++;
+      return {...q, prog, complete};
+    });
+    p.biome.quests.list=list;
+    p.biome.quests.done=done;
+
+    if(done===list.length && !p.biome.quests.rewarded){
+      p.biome.quests.rewarded=true;
+      p.biome.orbs+=2;
+      p.biome.health=clamp(p.biome.health+5,0,100);
+      p.biome.drops.push({date:new Date().toISOString(), item:"Quest Chest (+2 orbs)"});
+      toast("Biome quests cleared. Chest awarded.");
+    }
+  }
+
+  function maybeShowFutureSelf(){
+    const p=activeProfile();
+    const dueByCycle = p.futureSelfMsgs.filter(m=>m.deliverAtCycle<=state.timer.cycle);
+    const nowH=new Date().getHours();
+    const dueByHour = p.futureSelfMsgs.filter(m=>m.deliverAtHour!=null && m.deliverAtHour===nowH);
+    const due=[...dueByCycle, ...dueByHour];
+    if(due.length){
+      alert("Future-Self message:\n\n"+due.map(d=>d.msg).join("\n—\n"));
+      p.futureSelfMsgs = p.futureSelfMsgs.filter(m=>!due.includes(m));
+    }
+  }
+
+  function autoPromptWeatherIfNeeded(){
+    const p=activeProfile();
+    const d=new Date().toISOString().slice(0,10);
+    const w=p.stats.weatherByDate[d];
+    if(!w || w.count===0){
+      openDrawer("weather");
+      toast("Log Cognitive Weather first.");
+      return true;
+    }
+    return false;
+  }
+
+  /* Debt upgrades */
+  function applyDebtInterestIfNeeded(){
+    const p=activeProfile();
+    const d=new Date().toISOString().slice(0,10);
+    p._lastDebtDate ||= d;
+    if(p._lastDebtDate!==d && p.focusDebtSec>0){
+      p.focusDebtSec *= (1+p.debtInterest);
+      p._lastDebtDate=d;
+    }
+  }
+
+  function applyDebtToSession(){
+    const p=activeProfile();
+    applyDebtInterestIfNeeded();
+    if(!p.debtOn || p.focusDebtSec<=0) return 0;
+
+    const sessionAdd = p.debtPayoffMode==="frontload"
+      ? p.focusDebtSec
+      : Math.min(p.focusDebtSec, plannedSecFor("work")*0.5);
+
+    p.focusDebtSec -= sessionAdd;
+    state.timer.remainingSec += sessionAdd;
+    state.timer.plannedSec += sessionAdd;
+    return sessionAdd;
+  }
+
+  /* micro-challenge streak upgrades */
+  function pickMicroChallenge(){
+    const p=activeProfile();
+    if(!p.microChallengesOn || !p.microChallengePool.length) return null;
+    // adaptive difficulty: higher streak -> harder pick
+    const hard = p.microStreak>=4;
+    const pool = hard ? p.microChallengePool.slice(-5) : p.microChallengePool;
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
+
+  async function onSessionComplete(){
+    const t=state.timer, p=activeProfile();
+    const plannedMins = Math.round(t.plannedSec/60);
+
+    if(t.mode==="work"){
+      p.stats.focusCompleted++;
+      incrementByDate();
+      applyBiomeGain(plannedMins,false);
+      updateQuestProgress();
+
+      // Handoff checklist
+      const note = prompt("Handoff: next step(s). Separate by ';' if multiple.");
+      if(note && note.trim()){
+        const tasks=note.split(";").map(x=>x.trim()).filter(Boolean);
+        p.handoffNotes.push({date:new Date().toISOString(), tasks, cycle:t.cycle, done:Array(tasks.length).fill(false)});
+      }
+
+      if(p.autopsyOn) openAutopsyInline();
+
+      // rare future-self drop chance
+      if(Math.random()<0.12){
+        p.futureSelfMsgs.push({
+          msg:"You’re doing the work most people avoid. Keep going.",
+          createdAt:new Date().toISOString(),
+          deliverAtCycle: state.timer.cycle+1,
+          rare:true
+        });
+      }
+
+    }else{
+      p.stats.breaksCompleted++;
+      applyBiomeGain(Math.max(1,Math.round(plannedMins/2)), true);
+      updateQuestProgress();
+
+      // Micro-challenge on long breaks
+      if(t.mode==="long"){
+        const pick=pickMicroChallenge();
+        if(pick && Math.random()<0.75){
+          const ok=confirm(`Micro-Challenge:\n\n${pick}\n\nClick OK when done.`);
+          if(ok){
+            p.microStreak++;
+            p.microMaxStreak=Math.max(p.microMaxStreak,p.microStreak);
+            p.biome.orbs += (p.microStreak%3===0)?1:0;
+          }else{
+            p.microStreak=0;
+          }
+        }
+      }
+    }
+
+    try{
+      await fetch("/api/notify",{
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ title:"Ultra Pomodoro", body:`${modeLabel.textContent} complete.` })
+      });
+    }catch{}
+
+    advanceMode();
+    saveState(); renderTimer(); renderQuickbar();
+    if(p.autoStart) startTimer(true);
+  }
+
+  function advanceMode(){
+    if(raf){ cancelAnimationFrame(raf); raf=null; }
+    const t=state.timer, p=activeProfile();
+    if(t.mode==="work"){
+      t.mode = (t.cycle % p.longEvery === 0) ? "long" : "short";
+    }else{
+      t.mode="work"; t.cycle++;
+    }
+    adaptiveDurations();
+    const ps=plannedSecFor(t.mode);
+    t.plannedSec=ps; t.remainingSec=ps; t.isRunning=false; t.lastTick=null;
+    p.stats.replay.push({ts:new Date().toISOString(), event:`advance:${t.mode}`});
+  }
+
+  let raf=null;
+  function tickLoop(){
+    const t=state.timer;
+    if(!t.isRunning){ cancelAnimationFrame(raf); raf=null; return; }
+    const now=performance.now();
+    if(!t.lastTick) t.lastTick=now;
+    const delta=(now - t.lastTick)/1000;
+    t.lastTick=now;
+    t.remainingSec-=delta;
+
+    if(t.remainingSec<=0){
+      t.remainingSec=0; t.isRunning=false; t.lastTick=null;
+      saveState(); renderTimer(); onSessionComplete(); return;
+    }
+    renderTimer();
+    raf=requestAnimationFrame(tickLoop);
+  }
+
+  function needMicroGoal(){ return activeProfile().microGoalOn && state.timer.mode==="work"; }
+
+  async function startTimer(force=false){
+    const t=state.timer, p=activeProfile();
+    if(t.isRunning) return;
+
+    if(t.mode==="work" && !force){
+      if(autoPromptWeatherIfNeeded()) return;
+    }
+
+    // use last handoff as suggested micro-goal
+    const lastHandoff=p.handoffNotes.at(-1);
+    const suggestion = lastHandoff?.tasks?.find((_,i)=>!lastHandoff.done[i]);
+
+    if(needMicroGoal() && !force){
+      maybeShowFutureSelf();
+      const goal=prompt("Micro-goal for this focus session:", suggestion||"");
+      if(goal===null) return;
+      if(goal.trim().length<2){ toast("Micro-goal too short."); return; }
+      p.lastGoal=goal.trim();
+      renderGoal();
+    }
+
+    if(t.mode==="work"){
+      const add=applyDebtToSession();
+      if(add>0) toast(`Debt applied: +${Math.round(add/60)}m`);
+    }
+
+    t.isRunning=true; t.lastTick=null;
+    p.stats.replay.push({ts:new Date().toISOString(), event:`start:${t.mode}`});
+    saveState(); renderTimer();
+    if(!raf) raf=requestAnimationFrame(tickLoop);
+    if(t.mode==="work" && p.blockOn) applyHostsBlockFromProfile();
+  }
+
+  function pauseTimer(){
+    if(raf){ cancelAnimationFrame(raf); raf=null; }
+    const t=state.timer; t.isRunning=false; t.lastTick=null;
+    activeProfile().stats.replay.push({ts:new Date().toISOString(), event:`pause:${t.mode}`});
+    saveState(); renderTimer();
+  }
+  function resetTimer(){
+    if(raf){ cancelAnimationFrame(raf); raf=null; }
+    const t=state.timer;
+    t.isRunning=false; t.lastTick=null;
+    const ps=plannedSecFor(t.mode); t.plannedSec=ps; t.remainingSec=ps;
+    activeProfile().stats.replay.push({ts:new Date().toISOString(), event:`reset:${t.mode}`});
+    saveState(); renderTimer();
+  }
+  function skipTimer(){
+    const p=activeProfile();
+    p.stats.replay.push({ts:new Date().toISOString(), event:`skip:${state.timer.mode}`});
+    if(state.timer.mode==="work"){
+      if(p.debtOn){
+        p.focusDebtSec += state.timer.plannedSec*p.debtRate;
+        toast(`Debt added: ${Math.round(state.timer.plannedSec*p.debtRate/60)}m`);
+      }
+      p.biome.health = clamp(p.biome.health-4,0,100);
+      const h=new Date().getHours();
+      p.stats.hourRisks[h] ||= {pen:0,skips:0};
+      p.stats.hourRisks[h].skips++;
+    }
+    pauseTimer(); onSessionComplete();
+  }
+
+  startBtn.onclick=()=>startTimer(false);
+  pauseBtn.onclick=pauseTimer;
+  skipBtn.onclick=skipTimer;
+  resetBtn.onclick=resetTimer;
+
+  /* Strict mode */
+  let strictClicksArmed=false;
+  function strictActive(){
+    const p=activeProfile();
+    return p.strictOn && state.timer.isRunning && state.timer.mode==="work";
+  }
+  function penalty(seconds){
+    state.timer.remainingSec+=seconds;
+    state.timer.plannedSec+=seconds;
+    saveState(); renderTimer();
+  }
+  function showLock(reason){
+    const p=activeProfile();
+    lockReason.textContent=reason;
+    lockPhraseShow.textContent=p.lockPhrase||"stay focused";
+    lockInput.value="";
+    lockOverlay.classList.add("show");
+    lockModal.classList.remove("shake");
+    setTimeout(()=>lockModal.classList.add("shake"),5);
+  }
+  function hideLock(){ lockOverlay.classList.remove("show"); }
+  function applyPunishment(type, reason){
+    const p=activeProfile();
+    if(p.biome.buffs.freePenaltyToday){
+      p.biome.buffs.freePenaltyToday=false;
+      toast("Relic shield absorbed a penalty.");
+      return;
+    }
+    incrementPenalty(type);
+    if(type==="warn"){ toast(reason); return; }
+    if(type==="penalty"){ penalty(p.penaltySec); toast(`${reason} +${p.penaltySec}s`); return; }
+    if(type==="lockout"){ penalty(p.penaltySec); showLock(`${reason} (+${p.penaltySec}s)`); }
+    p.biome.health = clamp(p.biome.health-1,0,100);
+  }
+  document.addEventListener("visibilitychange", ()=>{
+    const p=activeProfile();
+    if(strictActive() && document.hidden && p.strictFeatures.includes("tab")){
+      applyPunishment(p.punishTab,"Tab switch detected");
+    }
+  });
+  document.addEventListener("click",(e)=>{
+    const p=activeProfile();
+    if(!strictActive() || !strictClicksArmed) return;
+    if(!p.strictFeatures.includes("clicks")) return;
+    if(lockOverlay.classList.contains("show")) return;
+    const allowed=e.target.closest("#startBtn,#pauseBtn,#resetBtn,#skipBtn,select,input,textarea,button,.drawer,summary,.dock-btn,.toggle");
+    if(!allowed) applyPunishment(p.punishClicks,"Distracting click attempt");
+  },true);
+  window.addEventListener("keydown",(e)=>{
+    const p=activeProfile();
+    if(strictActive() && p.strictFeatures.includes("escape") && e.key==="Escape"){
+      applyPunishment("lockout","Escape key blocked");
+      e.preventDefault();
+    }
+  }, true);
+  lockSubmit.onclick=()=>{
+    const p=activeProfile();
+    if(lockInput.value.trim()===p.lockPhrase.trim()){
+      hideLock(); toast("Back to work.");
+    }else{
+      lockModal.classList.remove("shake");
+      setTimeout(()=>lockModal.classList.add("shake"),5);
+    }
+  };
+
+  /* Website blocking (unchanged) */
+  const parseDomains=str=>str.split(",").map(s=>s.trim()).filter(Boolean);
+  async function applyHostsBlock(domains){
+    try{
+      toast("Applying hosts block…");
+      const res=await fetch("/api/block/apply",{
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({ domains })
+      });
+      if(!res.ok){
+        const j=await res.json().catch(()=>({}));
+        toast(j.error||"Run server with sudo.");
+        return false;
+      }
+      toast("Hosts block active.");
+      return true;
+    }catch{
+      toast("Server not reachable.");
+      return false;
+    }
+  }
+  async function clearHostsBlock(){
+    try{
+      await fetch("/api/block/clear",{method:"POST"});
+      toast("Hosts block cleared.");
+    }catch{
+      toast("Server not reachable.");
+    }
+  }
+  function applyHostsBlockFromProfile(){
+    const p=activeProfile();
+    if(!p.domains?.length) return;
+    applyHostsBlock(p.domains);
+  }
+
+  /* Autopsy inline */
+  function openAutopsyInline(){
+    const p=activeProfile();
+    const body = `
+      <div class="section">
+        <div class="muted">Why did the focus session end / fail?</div>
+        <div class="row" id="autopsyChoicesRow" style="margin-top:6px; flex-wrap:wrap;"></div>
+        <label class="field">Notes<textarea id="autopsyNotesIn"></textarea></label>
+        <div class="row" style="justify-content:flex-end;">
+          <button class="btn primary" id="autopsySaveIn">Save Autopsy</button>
+        </div>
+      </div>
+    `;
+    openDrawer("forensics", body, "Autopsy");
+    const row=$("#autopsyChoicesRow");
+    autopsyReasons.forEach(r=>{
+      const b=document.createElement("button");
+      b.className="btn ghost";
+      b.textContent=r;
+      b.onclick=()=>{ row.dataset.reason=r; toast(`Selected: ${r}`); };
+      row.appendChild(b);
+    });
+    $("#autopsySaveIn").onclick=()=>{
+      const reason=row.dataset.reason || "Unspecified";
+      const notes=$("#autopsyNotesIn").value.trim();
+      p.stats.autopsies.push({date:new Date().toISOString(), reason, notes});
+      updateQuestProgress();
+      saveState();
+      toast("Autopsy saved.");
+      renderDrawerContent("forensics");
+    };
+  }
+
+  /* Quickbar */
+  function renderQuickbar(){
+    const p=activeProfile();
+    qtStrict.dataset.on = p.strictOn;
+    qtStrictS.textContent = p.strictOn ? "On" : "Off";
+    qtBlock.dataset.on = p.blockOn;
+    qtBlockS.textContent = p.blockOn ? "On" : "Off";
+    qtDebt.dataset.on = p.debtOn;
+    qtDebtS.textContent = p.debtOn ? "On" : "Off";
+  }
+  qtStrict.onclick=()=>{
+    const p=activeProfile();
+    p.strictOn=!p.strictOn; strictClicksArmed=p.strictOn;
+    saveState(); renderQuickbar(); toast(`Strict ${p.strictOn?"On":"Off"}`);
+  };
+  qtBlock.onclick=()=>{
+    const p=activeProfile();
+    p.blockOn=!p.blockOn;
+    saveState(); renderQuickbar();
+    if(!p.blockOn) clearHostsBlock();
+    toast(`Blocking ${p.blockOn?"On":"Off"}`);
+  };
+  qtDebt.onclick=()=>{
+    const p=activeProfile();
+    p.debtOn=!p.debtOn;
+    saveState(); renderQuickbar(); toast(`Debt ${p.debtOn?"On":"Off"}`);
+  };
+  qtWeather.onclick=()=>openDrawer("weather");
+  qtBiome.onclick=()=>openDrawer("biome");
+
+  function renderGoal(){
+    const p=activeProfile();
+    goalText.textContent = p.lastGoal ? `Goal: ${p.lastGoal}` : "";
+  }
+
+  /* === DRAWER / PANELS === */
+  const panels = {
+    profiles:{ /* same as previous version */
+      title:"Profiles",
+      render: ()=>{
+        const p=activeProfile();
+        const opts = state.profiles.map(x=>`<option value="${x.id}" ${x.id===state.activeProfileId?"selected":""}>${x.name}</option>`).join("");
+        return `
+          <div class="section">
+            <div class="row">
+              <select id="profileSelectIn">${opts}</select>
+              <button class="btn ghost" id="newProfileBtnIn">＋ New</button>
+              <button class="btn ghost" id="dupProfileBtnIn">⧉ Duplicate</button>
+              <button class="btn danger" id="delProfileBtnIn">🗑 Delete</button>
+            </div>
+            <div class="tinyline">Profiles store durations, strictness, blocklists, and stats independently.</div>
+          </div>
+          <div class="section">
+            <div class="row" style="justify-content:space-between;"><span class="muted">Focus completed</span><b>${p.stats.focusCompleted}</b></div>
+            <div class="row" style="justify-content:space-between;"><span class="muted">Breaks completed</span><b>${p.stats.breaksCompleted}</b></div>
+            <div class="row" style="justify-content:space-between;"><span class="muted">Shadow attention</span><b>${p.stats.shadowAttention}</b></div>
+            <div class="row" style="justify-content:space-between;"><span class="muted">Autopsies</span><b>${p.stats.autopsies.length}</b></div>
+          </div>
+        `;
+      },
+      bind: ()=>{
+        $("#profileSelectIn").onchange=()=>{
+          state.activeProfileId=$("#profileSelectIn").value;
+          state.timer.mode="work"; state.timer.cycle=1;
+          const ps=plannedSecFor("work");
+          state.timer.remainingSec=ps; state.timer.plannedSec=ps; state.timer.isRunning=false;
+          saveState(); renderTimer(); renderDrawerContent("profiles");
+        };
+        $("#newProfileBtnIn").onclick=()=>{
+          const name=prompt("Profile name?");
+          if(!name) return;
+          state.profiles.push(defaultProfile(name.trim()));
+          state.activeProfileId=state.profiles.at(-1).id;
+          saveState(); renderTimer(); renderDrawerContent("profiles");
+        };
+        $("#dupProfileBtnIn").onclick=()=>{
+          const c=structuredClone(activeProfile());
+          c.id=crypto.randomUUID(); c.name=c.name+" Copy";
+          state.profiles.push(c); state.activeProfileId=c.id;
+          saveState(); renderTimer(); renderDrawerContent("profiles");
+        };
+        $("#delProfileBtnIn").onclick=()=>{
+          if(state.profiles.length===1){ toast("Cannot delete last profile."); return; }
+          if(!confirm("Delete this profile?")) return;
+          const id=state.activeProfileId;
+          state.profiles=state.profiles.filter(x=>x.id!==id);
+          state.activeProfileId=state.profiles[0].id;
+          saveState(); renderTimer(); renderDrawerContent("profiles");
+        };
+      }
+    },
+
+    timer:{
+      title:"Timer Settings",
+      render: ()=>{
+        const p=activeProfile();
+        return `
+          <div class="section">
+            <h3 style="margin:0;">Durations</h3>
+            <div class="grid2">
+              <label class="field">Work (min)<input id="workMinIn" type="number" min="1" max="180" value="${p.durations.work}"/></label>
+              <label class="field">Short Break<input id="shortMinIn" type="number" min="1" max="90" value="${p.durations.short}"/></label>
+              <label class="field">Long Break<input id="longMinIn" type="number" min="1" max="120" value="${p.durations.long}"/></label>
+              <label class="field">Long Every<input id="longEveryIn" type="number" min="1" max="12" value="${p.longEvery}"/></label>
+              <label class="field">Auto start next
+                <select id="autoStartIn">
+                  <option value="on" ${p.autoStart?"selected":""}>On</option>
+                  <option value="off" ${!p.autoStart?"selected":""}>Off</option>
+                </select>
+              </label>
+              <label class="field">Adaptive durations
+                <select id="adaptiveOnIn">
+                  <option value="on" ${p.adaptiveOn?"selected":""}>On</option>
+                  <option value="off" ${!p.adaptiveOn?"selected":""}>Off</option>
+                </select>
+              </label>
+            </div>
+            <div class="row" style="justify-content:flex-end;">
+              <button class="btn primary" id="saveTimerBtnIn">Save</button>
+            </div>
+          </div>
+        `;
+      },
+      bind: ()=>{
+        $("#saveTimerBtnIn").onclick=()=>{
+          const p=activeProfile();
+          p.durations.work = clamp(+$("#workMinIn").value||25,1,180);
+          p.durations.short = clamp(+$("#shortMinIn").value||5,1,90);
+          p.durations.long = clamp(+$("#longMinIn").value||15,1,120);
+          p.longEvery = clamp(+$("#longEveryIn").value||4,1,12);
+          p.autoStart = $("#autoStartIn").value==="on";
+          p.adaptiveOn = $("#adaptiveOnIn").value==="on";
+          const ps=plannedSecFor(state.timer.mode);
+          state.timer.plannedSec=ps; state.timer.remainingSec=ps; state.timer.isRunning=false;
+          saveState(); renderTimer(); toast("Timer saved.");
+          renderDrawerContent("timer");
+        };
+      }
+    },
+
+    strict:{
+      title:"Strict Mode",
+      render: ()=>{
+        const p=activeProfile();
+        const feat = ["tab","clicks","idle","escape"].map(f=>{
+          const on=p.strictFeatures.includes(f);
+          return `<label class="toggle" data-on="${on}" data-feat="${f}">${f.toUpperCase()}</label>`;
+        }).join("");
+        return `
+          <div class="section">
+            <label class="field">Strict mode
+              <select id="strictOnIn">
+                <option value="off">Off</option>
+                <option value="on" ${p.strictOn?"selected":""}>On</option>
+              </select>
+            </label>
+
+            <div class="grid2">
+              <label class="field">Tab punishment
+                <select id="punishTabIn">
+                  <option value="warn" ${p.punishTab==="warn"?"selected":""}>Warn</option>
+                  <option value="penalty" ${p.punishTab==="penalty"?"selected":""}>Penalty</option>
+                  <option value="lockout" ${p.punishTab==="lockout"?"selected":""}>Lockout</option>
+                </select>
+              </label>
+
+              <label class="field">Click punishment
+                <select id="punishClicksIn">
+                  <option value="warn" ${p.punishClicks==="warn"?"selected":""}>Warn</option>
+                  <option value="penalty" ${p.punishClicks==="penalty"?"selected":""}>Penalty</option>
+                  <option value="lockout" ${p.punishClicks==="lockout"?"selected":""}>Lockout</option>
+                </select>
+              </label>
+
+              <label class="field">Penalty seconds<input id="penaltySecIn" type="number" min="0" max="600" value="${p.penaltySec}"/></label>
+              <label class="field">Lock phrase<input id="lockPhraseIn" value="${p.lockPhrase}"/></label>
+            </div>
+
+            <div class="muted">Strict features</div>
+            <div class="row" id="strictFeatRow">${feat}</div>
+
+            <div class="row" style="justify-content:flex-end;">
+              <button id="saveStrictBtnIn" class="btn primary">Save Strict</button>
+            </div>
+          </div>
+        `;
+      },
+      bind: ()=>{
+        const row=$("#strictFeatRow");
+        row.querySelectorAll(".toggle").forEach(t=>{
+          t.onclick=()=>{
+            const p=activeProfile();
+            const f=t.dataset.feat;
+            const on=p.strictFeatures.includes(f);
+            if(on) p.strictFeatures=p.strictFeatures.filter(x=>x!==f);
+            else p.strictFeatures.push(f);
+            saveState(); renderDrawerContent("strict");
+          };
+        });
+
+        $("#saveStrictBtnIn").onclick=()=>{
+          const p=activeProfile();
+          p.strictOn=$("#strictOnIn").value==="on";
+          p.punishTab=$("#punishTabIn").value;
+          p.punishClicks=$("#punishClicksIn").value;
+          p.penaltySec=clamp(+$("#penaltySecIn").value||0,0,600);
+          p.lockPhrase=$("#lockPhraseIn").value.trim()||"stay focused";
+          strictClicksArmed=p.strictOn;
+          saveState(); renderTimer(); toast("Strict saved.");
+        };
+      }
+    },
+
+    block:{
+      title:"Website Blocking",
+      render: ()=>{
+        const p=activeProfile();
+        return `
+          <div class="section">
+            <label class="field">Blocking
+              <select id="blockOnIn">
+                <option value="off">Off</option>
+                <option value="on" ${p.blockOn?"selected":""}>On</option>
+              </select>
+            </label>
+            <label class="field">Mode
+              <select id="blockModeIn">
+                <option value="blacklist" ${p.blockMode==="blacklist"?"selected":""}>Blacklist</option>
+                <option value="whitelist" ${p.blockMode==="whitelist"?"selected":""}>Whitelist</option>
+              </select>
+            </label>
+            <label class="field">Annoy mode
+              <select id="annoyOnIn">
+                <option value="on" ${p.annoyOn?"selected":""}>On</option>
+                <option value="off" ${!p.annoyOn?"selected":""}>Off</option>
+              </select>
+            </label>
+            <label class="field">Domains (comma separated)
+              <textarea id="domainsIn">${(p.domains||[]).join(", ")}</textarea>
+            </label>
+            <div class="row" style="justify-content:flex-end;">
+              <button class="btn primary" id="saveBlockBtnIn">Save Blocking</button>
+              <button class="btn ghost" id="applyHostsBtnIn">Apply Hosts Now</button>
+              <button class="btn danger" id="clearHostsBtnIn">Clear Hosts</button>
+            </div>
+          </div>
+        `;
+      },
+      bind: ()=>{
+        $("#saveBlockBtnIn").onclick=()=>{
+          const p=activeProfile();
+          p.blockOn=$("#blockOnIn").value==="on";
+          p.blockMode=$("#blockModeIn").value;
+          p.annoyOn=$("#annoyOnIn").value==="on";
+          p.domains=parseDomains($("#domainsIn").value);
+          saveState(); renderTimer(); toast("Blocking saved.");
+          if(!p.blockOn) clearHostsBlock();
+        };
+        $("#applyHostsBtnIn").onclick=()=>applyHostsBlockFromProfile();
+        $("#clearHostsBtnIn").onclick=()=>clearHostsBlock();
+      }
+    },
+
+    biome:{
+      title:"Biome System",
+      render: ()=>{
+        const p=activeProfile();
+        refreshQuestsIfNeeded();
+        updateQuestProgress();
+        const quests=p.biome.quests.list.map(q=>{
+          const pct = q.type==="pen" ? (q.complete?100:0) : clamp(Math.round(q.prog/q.target*100),0,100);
+          return `
+            <div class="section">
+              <div class="row" style="justify-content:space-between;">
+                <div>${q.text}</div>
+                <div class="pill">${q.complete?"✅":"⏳"} ${q.prog}/${q.target}</div>
+              </div>
+              <div class="bar"><div style="width:${pct}%"></div></div>
+            </div>`;
+        }).join("");
+
+        const typeOpts=biomeTypes.map(t=>`<option value="${t.id}" ${t.id===p.biome.type?"selected":""}>${t.emoji} ${t.name}</option>`).join("");
+        const relicShop=biomeRelics.map(r=>{
+          const owned=p.biome.relics.includes(r.id);
+          return `
+            <div class="row" style="justify-content:space-between;">
+              <div><b>${r.name}</b> <span class="tag">${r.effect}</span></div>
+              <button class="btn ${owned?"good":"ghost"}" data-buy="${r.id}" ${owned?"disabled":""}>${owned?"Owned":"Buy • "+r.cost+" orb"}</button>
+            </div>`;
+        }).join("");
+
+        return `
+          <div class="section">
+            <div class="row" style="justify-content:space-between;">
+              <div class="muted">Biome</div>
+              <div class="pill">Lv ${p.biome.level} • XP ${Math.round(p.biome.xp)} • Orbs ${p.biome.orbs}</div>
+            </div>
+            <div class="row" style="justify-content:space-between;">
+              <div>Health</div>
+              <div class="pill">${Math.round(p.biome.health)}%</div>
+            </div>
+            <div class="bar"><div style="width:${p.biome.health}%"></div></div>
+
+            <label class="field">Biome type
+              <select id="biomeTypeIn">${typeOpts}</select>
+            </label>
+          </div>
+
+          <div class="section">
+            <div class="muted">Daily Quests</div>
+            ${quests||"<div class='tinyline'>No quests yet.</div>"}
+          </div>
+
+          <div class="section">
+            <div class="muted">Relic Shop</div>
+            ${relicShop}
+          </div>
+
+          <div class="section">
+            <div class="muted">Drops</div>
+            ${(p.biome.drops||[]).slice(-8).reverse().map(d=>`<div class="tinyline">${d.item} <span class="tag">${new Date(d.date).toLocaleString()}</span></div>`).join("")||"<div class='tinyline'>No drops yet.</div>"}
+          </div>
+        `;
+      },
+      bind: ()=>{
+        $("#biomeTypeIn").onchange=()=>{
+          const p=activeProfile();
+          p.biome.type=$("#biomeTypeIn").value;
+          saveState(); renderDrawerContent("biome"); toast("Biome type set.");
+        };
+        drawerBody.querySelectorAll("[data-buy]").forEach(btn=>{
+          btn.onclick=()=>{
+            const p=activeProfile();
+            const id=btn.dataset.buy;
+            const relic=biomeRelics.find(r=>r.id===id);
+            if(!relic) return;
+            if(p.biome.orbs<relic.cost){ toast("Not enough orbs."); return; }
+            p.biome.orbs-=relic.cost;
+            p.biome.relics.push(id);
+            if(id==="seed") p.biome.buffs.xpBoostLeft=5;
+            if(id==="shield") p.biome.buffs.freePenaltyToday=true;
+            saveState(); renderDrawerContent("biome"); toast("Relic purchased.");
+          };
+        });
+      }
+    },
+
+    weather:{
+      title:"Cognitive Weather",
+      render: ()=>{
+        const p=activeProfile();
+        const today=new Date().toISOString().slice(0,10);
+        const w=p.stats.weatherByDate[today]||{energy:0,mood:0,clarity:0,count:0};
+        const avg = w.count? (w.energy+w.mood+w.clarity)/(3*w.count):0;
+        const circ=circadianProfile();
+        return `
+          <div class="section">
+            <div class="muted">Log today’s Cognitive Weather</div>
+            <div class="grid2">
+              <label class="field">Energy (1–5)<input id="wEnergyIn" type="number" min="1" max="5" value="3"/></label>
+              <label class="field">Mood (1–5)<input id="wMoodIn" type="number" min="1" max="5" value="3"/></label>
+              <label class="field">Clarity (1–5)<input id="wClarityIn" type="number" min="1" max="5" value="3"/></label>
+            </div>
+            <div class="row" style="justify-content:flex-end;">
+              <button class="btn primary" id="wLogBtnIn">Log Weather</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="row" style="justify-content:space-between;"><span>Today avg</span><b>${avg.toFixed(2)} / 5</b></div>
+            <div class="tinyline">Logs: ${w.count||0}</div>
+          </div>
+
+          <div class="section">
+            <div class="muted">Circadian averages</div>
+            <div class="tinyline">Morning: ${circ.morning.toFixed(2)}</div>
+            <div class="tinyline">Midday: ${circ.midday.toFixed(2)}</div>
+            <div class="tinyline">Afternoon: ${circ.afternoon.toFixed(2)}</div>
+            <div class="tinyline">Evening: ${circ.evening.toFixed(2)}</div>
+          </div>
+        `;
+      },
+      bind: ()=>{
+        $("#wLogBtnIn").onclick=()=>{
+          const p=activeProfile();
+          const today=new Date().toISOString().slice(0,10);
+          p.stats.weatherByDate[today] ||= {energy:0,mood:0,clarity:0,count:0};
+          const w=p.stats.weatherByDate[today];
+          w.energy += clamp(+$("#wEnergyIn").value||3,1,5);
+          w.mood += clamp(+$("#wMoodIn").value||3,1,5);
+          w.clarity += clamp(+$("#wClarityIn").value||3,1,5);
+          w.count++;
+          w.lastHour=new Date().getHours();
+          saveState(); renderDrawerContent("weather"); toast("Weather logged.");
+          updateQuestProgress();
+        };
+      }
+    },
+
+    forensics:{
+      title:"Forensics / Autopsy",
+      render: ()=>{
+        const p=activeProfile();
+        const items=(p.stats.autopsies||[]).slice(-12).reverse().map(a=>`
+          <div class="section">
+            <div class="row" style="justify-content:space-between;">
+              <b>${a.reason}</b>
+              <span class="tag">${new Date(a.date).toLocaleString()}</span>
+            </div>
+            <div class="tinyline">${a.notes||"No notes."}</div>
+          </div>`).join("");
+        return `
+          <div class="section">
+            <div class="muted">Recent autopsies</div>
+          </div>
+          ${items||"<div class='section tinyline'>No autopsies yet.</div>"}
+        `;
+      },
+      bind: ()=>{}
+    },
+
+    analytics:{
+      title:"Analytics",
+      render: ()=>{
+        const p=activeProfile();
+        const byDate=p.stats.byDate||{};
+        const days=Object.keys(byDate).sort();
+        const last14=days.slice(-14);
+        const total=days.reduce((a,d)=>a+byDate[d],0);
+        const heat=Array(84).fill(0); // 7*12
+        last14.forEach((d,idx)=>{
+          const v=byDate[d];
+          heat[idx]=v;
+        });
+        return `
+          <div class="section">
+            <div class="row" style="justify-content:space-between;">
+              <div class="muted">Total focus sessions</div>
+              <div class="pill">${total}</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="muted">Last 14 days heatmap</div>
+            <div class="heat">
+              ${heat.map(v=>`<div title="${v}"></div>`).join("")}
+            </div>
+            <div class="tinyline">Darker squares = more focus sessions.</div>
+          </div>
+        `;
+      },
+      bind: ()=>{
+        // colorize heatmap based on values
+        const p=activeProfile();
+        const byDate=p.stats.byDate||{};
+        const days=Object.keys(byDate).sort();
+        const last14=days.slice(-14);
+        const vals=last14.map(d=>byDate[d]||0);
+        const max=Math.max(1,...vals);
+        drawerBody.querySelectorAll(".heat div").forEach((cell,i)=>{
+          const v=vals[i]||0;
+          const alpha=clamp(v/max,0,1);
+          cell.style.background=`color-mix(in oklab, var(--accent) ${Math.round(alpha*65)}%, var(--btn))`;
+        });
+      }
+    },
+
+    tools:{
+      title:"Tools",
+      render: ()=>{
+        const p=activeProfile();
+        return `
+          <div class="section">
+            <div class="muted">Export / Import</div>
+            <div class="row">
+              <button class="btn ghost" id="exportJsonIn">Export JSON</button>
+              <button class="btn ghost" id="importJsonIn">Import JSON</button>
+              <input id="importFileIn" type="file" accept="application/json" hidden />
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="muted">Micro-Challenges</div>
+            <label class="field">Enable micro-challenges
+              <select id="mcOnIn">
+                <option value="on" ${p.microChallengesOn?"selected":""}>On</option>
+                <option value="off" ${!p.microChallengesOn?"selected":""}>Off</option>
+              </select>
+            </label>
+            <label class="field">Pool (semicolon separated)
+              <textarea id="mcPoolIn">${(p.microChallengePool||[]).join("; ")}</textarea>
+            </label>
+            <div class="row" style="justify-content:flex-end;">
+              <button class="btn primary" id="mcSaveIn">Save Micro-Challenges</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="muted">Companion Mode (sync rooms)</div>
+            <div class="tinyline">WebSocket-only. Accessing via Cloudflare tunnel link.</div>
+
+            <label class="field">Companion Mode
+              <select id="companionOn">
+                <option value="off">Off</option>
+                <option value="on" ${p.companionOn?"selected":""}>On</option>
+              </select>
+            </label>
+
+            <div class="row">
+              <input id="roomId" placeholder="room id (e.g. bio-chem)" value="${p.roomId||""}" />
+              <button class="btn ghost" id="joinRoomBtn">Join Room</button>
+              <button class="btn ghost" id="leaveRoomBtn">Leave</button>
+              <span id="roomStatus" class="pill">Not connected</span>
+            </div>
+          </div>
+        `;
+      },
+      bind: ()=>{
+        const p=activeProfile();
+
+        $("#exportJsonIn").onclick=()=>{
+          const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement("a");
+          a.href=url; a.download="ultra-pomodoro-state.json"; a.click();
+          URL.revokeObjectURL(url);
+        };
+        $("#importJsonIn").onclick=()=>$("#importFileIn").click();
+        $("#importFileIn").onchange=async ()=>{
+          const f=$("#importFileIn").files[0]; if(!f) return;
+          const txt=await f.text();
+          try{
+            state=loadState(JSON.parse(txt));
+            saveState();
+            renderTimer(); renderDrawerContent("profiles"); toast("Imported ✅");
+          }catch{ toast("Import failed."); }
+        };
+
+        $("#mcSaveIn").onclick=()=>{
+          p.microChallengesOn=$("#mcOnIn").value==="on";
+          p.microChallengePool = $("#mcPoolIn").value.split(";").map(x=>x.trim()).filter(Boolean);
+          saveState(); toast("Micro-challenges saved.");
+          renderDrawerContent("tools");
+        };
+
+        const statusEl=()=>$("#roomStatus");
+
+        $("#companionOn").onchange=async ()=>{
+          p.companionOn = $("#companionOn").value==="on";
+          saveState();
+          if(!p.companionOn && companionSocket){
+            companionSocket.disconnect();
+            companionSocket=null;
+          }
+          setCompanionStatus(p.companionOn ? "Idle":"Off");
+          renderDrawerContent("tools");
+        };
+
+        $("#joinRoomBtn").onclick=async ()=>{
+          if(!p.roomId){ toast("Enter a room id."); return; }
+          const sock=await ensureCompanionSocket();
+          if(!sock) return;
+          sock.emit("room:join",{roomId:p.roomId});
+          setCompanionStatus("Joining…");
+        };
+        $("#leaveRoomBtn").onclick=async ()=>{
+          if(!p.roomId) return;
+          const sock=await ensureCompanionSocket();
+          if(!sock) return;
+          sock.emit("room:leave",{roomId:p.roomId});
+          setCompanionStatus("Leaving…");
+        };
+
+        // initial status paint
+        setCompanionStatus(p.companionOn ? (companionSocket?.connected?"Connected":"Idle") : "Off");
+        if(statusEl()) statusEl().textContent = p.companionOn ? "Idle" : "Off";
+      }
+    }
+  };
+
+  function openDrawer(panelKey, overrideBodyHTML=null, overrideTitle=null){
+    [...dock.children].forEach(b=>b.classList.toggle("active", b.dataset.panel===panelKey));
+    drawerTitle.textContent = overrideTitle || panels[panelKey]?.title || "Panel";
+    drawerBody.innerHTML = overrideBodyHTML || panels[panelKey]?.render?.() || "";
+    drawerBackdrop.classList.add("show");
+    drawer.classList.add("show");
+    panels[panelKey]?.bind?.();
+  }
+  function closeDrawer(){
+    drawerBackdrop.classList.remove("show");
+    drawer.classList.remove("show");
+    [...dock.children].forEach(b=>b.classList.remove("active"));
+  }
+  function renderDrawerContent(panelKey){
+    if(!drawer.classList.contains("show")) return;
+    openDrawer(panelKey);
+  }
+
+  drawerClose.onclick=closeDrawer;
+  drawerBackdrop.onclick=closeDrawer;
+
+  dock.querySelectorAll(".dock-btn").forEach(btn=>{
+    btn.onclick=()=>{
+      const panel=btn.dataset.panel;
+      if(drawer.classList.contains("show") && btn.classList.contains("active")) closeDrawer();
+      else openDrawer(panel);
+    };
+  });
+
+  /* Companion Mode Sync */
+  let companionSocket=null;
+  let companionRoomJoined=false;
+
+  function companionEls(){
+    return {
+      status: $("#roomStatus"),
+      roomInput: $("#roomId")
+    };
+  }
+
+  function setCompanionStatus(txt){
+    const { status } = companionEls();
+    if(status) status.textContent = txt;
+  }
+
+  async function ensureCompanionSocket(){
+    const p = activeProfile();
+    if(!p.companionOn){
+      setCompanionStatus("Off");
+      return null;
+    }
+
+    // wait for loader
+    if(!window.io){
+      toast("Socket.IO client not loaded yet.");
+      return null;
+    }
+
+    if(companionSocket && companionSocket.connected) return companionSocket;
+
+    companionSocket = window.io("", {          // same-origin, works on trycloudflare
+      path: "/socket.io",
+      transports: ["websocket"],              // mandatory for tunnel stability
+      upgrade: false,
+      reconnection: true,
+      reconnectionDelay: 600,
+      timeout: 8000
+    });
+
+    companionSocket.on("connect", ()=>{
+      setCompanionStatus("Connected (not in room)");
+      if(p.roomId){
+        companionSocket.emit("room:join", { roomId: p.roomId });
+      }
+    });
+
+    companionSocket.on("disconnect", ()=>{
+      companionRoomJoined = false;
+      setCompanionStatus("Disconnected");
+    });
+
+    companionSocket.on("connect_error", ()=>{
+      companionRoomJoined = false;
+      setCompanionStatus("Connection error");
+    });
+
+    companionSocket.on("room:joined", (data)=>{
+      companionRoomJoined = true;
+      setCompanionStatus(`In room: ${data.roomId}`);
+      companionSocket.emit("state:request", { roomId: data.roomId });
+    });
+
+    companionSocket.on("room:left", ()=>{
+      companionRoomJoined = false;
+      setCompanionStatus("Left room");
+    });
+
+    companionSocket.on("state:push", (payload)=>{
+      try{
+        if(!payload || !payload.state) return;
+        state = loadState(payload.state);
+        saveState();
+        renderTimer();
+        if(drawer.classList.contains("show")){
+          const active = [...dock.children].find(b=>b.classList.contains("active"));
+          if(active) renderDrawerContent(active.dataset.panel);
+        }
+        toast("State synced.");
+      }catch(e){
+        console.warn("Bad state push", e);
+      }
+    });
+
+    companionSocket.on("timer:sync", (payload)=>{
+      if(!payload || !payload.timer) return;
+      state.timer = {...state.timer, ...payload.timer};
+      saveState(); renderTimer();
+    });
+
+    return companionSocket;
+  }
+
+  function pushTimerSync(){
+    const p=activeProfile();
+    if(!p.companionOn || !companionSocket || !companionSocket.connected || !companionRoomJoined) return;
+    companionSocket.emit("timer:sync", { roomId:p.roomId, timer: state.timer });
+  }
+
+  // push periodic timer sync while running
+  setInterval(()=>{ if(state.timer.isRunning) pushTimerSync(); }, 1000);
+
+  /* Palette */
+  const paletteCommands = [
+    {key:"profiles", label:"Open Profiles", action:()=>openDrawer("profiles")},
+    {key:"timer", label:"Open Timer Settings", action:()=>openDrawer("timer")},
+    {key:"strict", label:"Open Strict Mode", action:()=>openDrawer("strict")},
+    {key:"block", label:"Open Blocking", action:()=>openDrawer("block")},
+    {key:"biome", label:"Open Biome", action:()=>openDrawer("biome")},
+    {key:"weather", label:"Open Weather", action:()=>openDrawer("weather")},
+    {key:"forensics", label:"Open Forensics", action:()=>openDrawer("forensics")},
+    {key:"analytics", label:"Open Analytics", action:()=>openDrawer("analytics")},
+    {key:"tools", label:"Open Tools", action:()=>openDrawer("tools")},
+    {key:"start", label:"Start Timer", action:()=>startTimer(false)},
+    {key:"pause", label:"Pause Timer", action:()=>pauseTimer()},
+    {key:"reset", label:"Reset Timer", action:()=>resetTimer()},
+    {key:"skip", label:"Skip Session", action:()=>skipTimer()},
+    {key:"strict on", label:"Strict ON", action:()=>{ const p=activeProfile(); p.strictOn=true; strictClicksArmed=true; saveState(); renderTimer(); toast("Strict ON"); }},
+    {key:"strict off", label:"Strict OFF", action:()=>{ const p=activeProfile(); p.strictOn=false; strictClicksArmed=false; saveState(); renderTimer(); toast("Strict OFF"); }},
+    {key:"block on", label:"Blocking ON", action:()=>{ const p=activeProfile(); p.blockOn=true; saveState(); renderTimer(); toast("Blocking ON"); }},
+    {key:"block off", label:"Blocking OFF", action:()=>{ const p=activeProfile(); p.blockOn=false; saveState(); clearHostsBlock(); renderTimer(); toast("Blocking OFF"); }}
+  ];
+
+  function showPalette(){
+    palette.classList.add("show");
+    paletteInput.value="";
+    renderPaletteList("");
+    paletteInput.focus();
+  }
+  function hidePalette(){ palette.classList.remove("show"); }
+  paletteBtn.onclick=showPalette;
+  window.addEventListener("keydown",(e)=>{
+    const meta=e.ctrlKey||e.metaKey;
+    if(meta && e.key.toLowerCase()==="k"){ e.preventDefault(); showPalette(); }
+    if(e.key==="Escape" && palette.classList.contains("show")) hidePalette();
+  });
+
+  function renderPaletteList(q){
+    const query=q.toLowerCase().trim();
+    const items=paletteCommands.filter(c=>c.key.includes(query)||c.label.toLowerCase().includes(query)).slice(0,12);
+    paletteList.innerHTML = items.map((c,i)=>`<div class="palette-item" data-i="${i}">${c.label} <span class="tag">(${c.key})</span></div>`).join("");
+    paletteList.querySelectorAll(".palette-item").forEach((el,idx)=>{
+      el.onclick=()=>{ items[idx].action(); hidePalette(); };
+    });
+  }
+  paletteInput.oninput=()=>renderPaletteList(paletteInput.value);
+
+  /* Init */
+  buildModes();
+  renderGoal();
+  renderTimer();
+  renderQuickbar();
+
+  /* Companion inputs persistence (fixed saveProfiles -> saveState) */
+  document.addEventListener("change",(e)=>{
+    const t=e.target;
+    if(!t || !t.id) return;
+    const p=activeProfile();
+    if(t.id==="companionOn"){
+      p.companionOn = (t.value==="on");
+      saveState();
+      if(!p.companionOn && companionSocket){
+        companionSocket.disconnect();
+        companionSocket=null;
+      }
+      setCompanionStatus(p.companionOn ? "Idle":"Off");
+    }
+    if(t.id==="roomId"){
+      p.roomId=(t.value||"").trim();
+      saveState();
+    }
+  });
+  document.addEventListener("input",(e)=>{
+    const t=e.target;
+    if(!t || t.id!=="roomId") return;
+    const p=activeProfile();
+    p.roomId=(t.value||"").trim();
+    saveState();
+  });
+
+  // global fallback click handler for join/leave (guarded to avoid double-fire)
+  document.addEventListener("click",(e)=>{
+    const t=e.target;
+    if(!t || !t.id) return;
+
+    // If a panel bind already attached an onclick handler, don't double-fire here.
+    if((t.id==="joinRoomBtn" || t.id==="leaveRoomBtn") && typeof t.onclick==="function") return;
+
+    if(t.id==="joinRoomBtn"){
+      (async ()=>{
+        const p=activeProfile();
+        if(!p.roomId){ toast("Enter a room id."); return; }
+        const sock=await ensureCompanionSocket();
+        if(!sock) return;
+        sock.emit("room:join",{roomId:p.roomId});
+        setCompanionStatus("Connected");
+      })();
+    }
+    if(t.id==="leaveRoomBtn"){
+      (async ()=>{
+        const p=activeProfile();
+        if(!p.roomId){ return; }
+        const sock=await ensureCompanionSocket();
+        if(!sock) return;
+        sock.emit("room:leave",{roomId:p.roomId});
+        setCompanionStatus("Disconnected");
+      })();
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
