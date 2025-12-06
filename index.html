@@ -443,11 +443,13 @@
   ];
 
   const STORAGE_KEY = "ultraPomodoroStateV10Dock";
+  const API_BASE = "https://pmdr.onrender.com"; // change to your deployed server.py URL
   const BLOCKING_AVAILABLE = (
     location.hostname === "localhost" ||
     location.hostname === "127.0.0.1" ||
     location.hostname.endsWith(".local")
   );
+  const COMPANION_WARN_GHPAGES = location.hostname.includes("github.io");
   const $ = s => document.querySelector(s);
 
   function defaultProfile(name="Default"){
@@ -928,7 +930,7 @@
     }
 
     try{
-      await fetch("/api/notify",{
+      await fetch(`${API_BASE}/api/notify`,{
         method:"POST", headers:{ "Content-Type":"application/json" },
         body: JSON.stringify({ title:"Ultra Pomodoro", body:`${modeLabel.textContent} complete.` })
       });
@@ -1115,7 +1117,7 @@
     }
     try{
       toast("Applying hosts block…");
-      const res=await fetch("/api/block/apply",{
+      const res=await fetch(`${API_BASE}/api/block/apply`,{
         method:"POST", headers:{ "Content-Type":"application/json" },
         body:JSON.stringify({ domains })
       });
@@ -1137,7 +1139,7 @@
       return;
     }
     try{
-      await fetch("/api/block/clear",{method:"POST"});
+      await fetch(`${API_BASE}/api/block/clear`,{method:"POST"});
       toast("Hosts block cleared.");
     }catch{
       toast("Server not reachable.");
@@ -1699,10 +1701,13 @@
 
             <div class="row">
               <input id="roomId" placeholder="room id (e.g. bio-chem)" value="${p.roomId||""}" />
-              <button class="btn ghost" id="joinRoomBtn">Join Room</button>
+              <button class="btn ghost" id="createRoomBtn">Create</button>
+              <button class="btn ghost" id="joinRoomBtn">Join</button>
               <button class="btn ghost" id="leaveRoomBtn">Leave</button>
               <span id="roomStatus" class="pill">Not connected</span>
             </div>
+            <div class="tinyline">Create = start a room (auto generates if empty). Join = enter an existing room.</div>
+            ${COMPANION_WARN_GHPAGES ? `<div class="tinyline">On GitHub Pages you need server.py running somewhere reachable (Socket.IO) or Companion will show connection errors.</div>` : ""}
           </div>
         `;
       },
@@ -1747,18 +1752,33 @@
           renderDrawerContent("tools");
         };
 
-        $("#joinRoomBtn").onclick=async ()=>{
-          if(!p.roomId){ toast("Enter a room id."); return; }
+        const ensureRoomId=()=>{
+          let rid = ($("#roomId")?.value||"").trim();
+          if(!rid) rid=genRoomId();
+          setRoomId(rid);
+          return rid;
+        };
+
+        $("#createRoomBtn").onclick=async ()=>{
           const sock=await ensureCompanionSocket();
           if(!sock) return;
-          sock.emit("room:join",{roomId:p.roomId});
+          const rid=ensureRoomId();
+          sock.emit("room:create",{roomId:rid});
+          setCompanionStatus("Creating…");
+        };
+        $("#joinRoomBtn").onclick=async ()=>{
+          const sock=await ensureCompanionSocket();
+          if(!sock) return;
+          const rid=ensureRoomId();
+          sock.emit("room:join",{roomId:rid});
           setCompanionStatus("Joining…");
         };
         $("#leaveRoomBtn").onclick=async ()=>{
-          if(!p.roomId) return;
+          const rid = ($("#roomId")?.value||p.roomId||"").trim();
+          if(!rid) return;
           const sock=await ensureCompanionSocket();
           if(!sock) return;
-          sock.emit("room:leave",{roomId:p.roomId});
+          sock.emit("room:leave",{roomId:rid});
           setCompanionStatus("Leaving…");
         };
 
@@ -1801,6 +1821,8 @@
   /* Companion Mode Sync */
   let companionSocket=null;
   let companionRoomJoined=false;
+  let companionWarned=false;
+  const genRoomId=()=>`room-${Math.random().toString(36).slice(2,7)}`;
 
   function companionEls(){
     return {
@@ -1814,11 +1836,29 @@
     if(status) status.textContent = txt;
   }
 
+  function setRoomId(id){
+    const { roomInput } = companionEls();
+    if(roomInput) roomInput.value=id;
+    const p=activeProfile();
+    p.roomId=id;
+    saveState();
+  }
+
+  function membersSuffix(data){
+    const m=data?.members;
+    return typeof m==="number" ? ` (${m} in room)` : "";
+  }
+
   async function ensureCompanionSocket(){
     const p = activeProfile();
     if(!p.companionOn){
       setCompanionStatus("Off");
       return null;
+    }
+
+    if(COMPANION_WARN_GHPAGES && !companionWarned){
+      toast("Companion Mode needs server.py running; GitHub Pages has no socket server.");
+      companionWarned=true;
     }
 
     // wait for loader
@@ -1829,7 +1869,7 @@
 
     if(companionSocket && companionSocket.connected) return companionSocket;
 
-    companionSocket = window.io("", {          // same-origin, works on trycloudflare
+    companionSocket = window.io(API_BASE, {     // point to hosted backend
       path: "/socket.io",
       transports: ["websocket"],              // mandatory for tunnel stability
       upgrade: false,
@@ -1852,12 +1892,31 @@
 
     companionSocket.on("connect_error", ()=>{
       companionRoomJoined = false;
-      setCompanionStatus("Connection error");
+      setCompanionStatus("Connection error (run server.py)");
+      if(!companionWarned){
+        toast("Companion Mode requires the backend server (server.py) on this origin.");
+        companionWarned=true;
+      }
+    });
+
+    companionSocket.on("room:created", (data)=>{
+      if(!data?.roomId) return;
+      companionRoomJoined = true;
+      setRoomId(data.roomId);
+      setCompanionStatus(`Room created: ${data.roomId}${membersSuffix(data)}`);
+    });
+
+    companionSocket.on("room:members", (data)=>{
+      if(!data?.roomId) return;
+      if(companionRoomJoined){
+        setCompanionStatus(`In room: ${data.roomId}${membersSuffix(data)}`);
+      }
     });
 
     companionSocket.on("room:joined", (data)=>{
       companionRoomJoined = true;
-      setCompanionStatus(`In room: ${data.roomId}`);
+      if(data?.roomId) setRoomId(data.roomId);
+      setCompanionStatus(`In room: ${data.roomId}${membersSuffix(data)}`);
       companionSocket.emit("state:request", { roomId: data.roomId });
     });
 
