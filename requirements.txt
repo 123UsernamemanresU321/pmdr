@@ -3,3 +3,5 @@ flask-socketio==5.3.6
 python-socketio==5.11.2
 python-engineio==4.9.0
 plyer
+eventlet==0.36.1
+gunicorn==21.2.0
