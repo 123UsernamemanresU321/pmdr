@@ -20,10 +20,19 @@ are not intercepting DNS/hosts resolution.
 """
 
 # ---------------------------------------------------------------------------
-# Async mode: use threading (compatible with Python 3.13 on Render)
+# Async mode selection: prefer eventlet (for Socket.IO/WebSockets); fall back to threading.
 # ---------------------------------------------------------------------------
 import os
 import platform
+ASYNC_MODE = "threading"
+try:
+    import eventlet  # noqa: WPS433
+
+    eventlet.monkey_patch()
+    ASYNC_MODE = "eventlet"
+except Exception:
+    # Eventlet may be unavailable (or incompatible with runtime); fallback to threading.
+    ASYNC_MODE = "threading"
 
 # ---------------------------------------------------------------------------
 # Standard imports after monkey_patch
@@ -55,8 +64,14 @@ HOSTS_TAG_END = "# === ULTRA_POMODORO_BLOCK_END ==="
 # App init
 # ---------------------------------------------------------------------------
 app = Flask(__name__, static_folder=None)
-# Use threading mode to avoid eventlet incompatibilities on Python 3.13.
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+# Generous ping settings to survive background-tab throttling and hosted network jitter.
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode=ASYNC_MODE,
+    ping_interval=25,
+    ping_timeout=60,
+)
 
 # ---------------------------------------------------------------------------
 # Utilities
@@ -346,10 +361,8 @@ if __name__ == "__main__":
     else:
         print("[BLOCK] Hosts blocking DISABLED (run with sudo to enable).")
 
-    socketio.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        debug=False,
-        allow_unsafe_werkzeug=True  # allow Werkzeug in Render/production when using threading mode
-    )
+    run_kwargs = dict(host="0.0.0.0", port=port, debug=False)
+    if ASYNC_MODE == "threading":
+        # Werkzeug is only acceptable for threading fallback / non-prod.
+        run_kwargs["allow_unsafe_werkzeug"] = True
+    socketio.run(app, **run_kwargs)
