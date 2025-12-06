@@ -399,8 +399,8 @@
     });
   }
   try{
-    await loadScript("/socket.io/socket.io.js");
-    console.log("Socket.IO loaded from server");
+    await loadScript(`${API_BASE}/socket.io/socket.io.js`);
+    console.log("Socket.IO loaded from API base");
     return;
   }catch(e){
     console.warn("Local Socket.IO not found, falling back to CDN");
