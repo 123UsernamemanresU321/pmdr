@@ -346,4 +346,10 @@ if __name__ == "__main__":
     else:
         print("[BLOCK] Hosts blocking DISABLED (run with sudo to enable).")
 
-    socketio.run(app, host="0.0.0.0", port=port, debug=False)
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        debug=False,
+        allow_unsafe_werkzeug=True  # allow Werkzeug in Render/production when using threading mode
+    )
