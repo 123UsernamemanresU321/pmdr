@@ -343,6 +343,14 @@ def on_timer_sync(data):
         return
     emit("timer:state", data, room=room_id, include_self=False)
 
+@socketio.on("timer:request")
+def on_timer_request(data):
+    room_id = (data or {}).get("roomId", "").strip()
+    if not room_id:
+        return
+    # Ask other members to broadcast their timer state to the requester
+    emit("timer:request", data, room=room_id, include_self=False)
+
 @socketio.on("timer:penalty")
 def on_timer_penalty(data):
     room_id = (data or {}).get("roomId", "").strip()
