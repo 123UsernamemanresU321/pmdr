@@ -1763,23 +1763,43 @@
           const sock=await ensureCompanionSocket();
           if(!sock) return;
           const rid=ensureRoomId();
-          sock.emit("room:create",{roomId:rid});
           setCompanionStatus("Creating…");
+          emitWithAck(sock,"room:create",{roomId:rid},
+            (resp)=>{
+              companionRoomJoined=true;
+              setRoomId(resp.roomId);
+              setCompanionStatus(`Room created: ${resp.roomId}${membersSuffix(resp)}`);
+            },
+            (msg)=>{ setCompanionStatus("Create failed"); toast(msg||"Create failed"); }
+          );
         };
         $("#joinRoomBtn").onclick=async ()=>{
           const sock=await ensureCompanionSocket();
           if(!sock) return;
           const rid=ensureRoomId();
-          sock.emit("room:join",{roomId:rid});
           setCompanionStatus("Joining…");
+          emitWithAck(sock,"room:join",{roomId:rid},
+            (resp)=>{
+              companionRoomJoined=true;
+              setRoomId(resp.roomId);
+              setCompanionStatus(`In room: ${resp.roomId}${membersSuffix(resp)}`);
+            },
+            (msg)=>{ setCompanionStatus("Join failed"); toast(msg||"Join failed"); }
+          );
         };
         $("#leaveRoomBtn").onclick=async ()=>{
           const rid = ($("#roomId")?.value||p.roomId||"").trim();
-          if(!rid) return;
+          if(!rid){ toast("No room id to leave."); return; }
           const sock=await ensureCompanionSocket();
           if(!sock) return;
-          sock.emit("room:leave",{roomId:rid});
           setCompanionStatus("Leaving…");
+          emitWithAck(sock,"room:leave",{roomId:rid},
+            (resp)=>{
+              companionRoomJoined=false;
+              setCompanionStatus("Left room");
+            },
+            (msg)=>{ setCompanionStatus("Leave failed"); toast(msg||"Leave failed"); }
+          );
         };
 
         // initial status paint
@@ -1847,6 +1867,17 @@
   function membersSuffix(data){
     const m=data?.members;
     return typeof m==="number" ? ` (${m} in room)` : "";
+  }
+
+  function emitWithAck(sock, event, payload, onOk, onErr){
+    sock.timeout(3000).emit(event, payload, (err, resp)=>{
+      if(err || !resp || resp.ok===false){
+        const msg = resp?.error || err?.message || "Error";
+        onErr?.(msg, resp);
+      }else{
+        onOk?.(resp);
+      }
+    });
   }
 
   async function ensureCompanionSocket(){
