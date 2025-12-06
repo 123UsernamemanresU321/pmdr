@@ -1796,6 +1796,7 @@
           emitWithAck(sock,"room:leave",{roomId:rid},
             (resp)=>{
               companionRoomJoined=false;
+              companionOptedOut=true;
               setCompanionStatus("Left room");
             },
             (msg)=>{ setCompanionStatus("Leave failed"); toast(msg||"Leave failed"); }
@@ -1842,7 +1843,9 @@
   let companionSocket=null;
   let companionRoomJoined=false;
   let companionWarned=false;
+  let companionOptedOut=false;
   const genRoomId=()=>`room-${Math.random().toString(36).slice(2,7)}`;
+  let lastJoinAttempt=0;
 
   function companionEls(){
     return {
@@ -1880,6 +1883,25 @@
     });
   }
 
+  function joinRoomWithAck(sock, rid){
+    const now=Date.now();
+    if(now - lastJoinAttempt < 1500) return;
+    lastJoinAttempt=now;
+    companionOptedOut=false;
+    setCompanionStatus("Joining…");
+    emitWithAck(sock,"room:join",{roomId:rid},
+      (resp)=>{
+        companionRoomJoined=true;
+        setRoomId(resp.roomId);
+        setCompanionStatus(`In room: ${resp.roomId}${membersSuffix(resp)}`);
+      },
+      (msg)=>{
+        setCompanionStatus("Join failed");
+        toast(msg||"Join failed");
+      }
+    );
+  }
+
   async function ensureCompanionSocket(){
     const p = activeProfile();
     if(!p.companionOn){
@@ -1912,7 +1934,7 @@
     companionSocket.on("connect", ()=>{
       setCompanionStatus("Connected (not in room)");
       if(p.roomId){
-        companionSocket.emit("room:join", { roomId: p.roomId });
+        joinRoomWithAck(companionSocket, p.roomId);
       }
     });
 
@@ -1933,6 +1955,7 @@
     companionSocket.on("room:created", (data)=>{
       if(!data?.roomId) return;
       companionRoomJoined = true;
+      companionOptedOut = false;
       setRoomId(data.roomId);
       setCompanionStatus(`Room created: ${data.roomId}${membersSuffix(data)}`);
     });
@@ -1946,6 +1969,7 @@
 
     companionSocket.on("room:joined", (data)=>{
       companionRoomJoined = true;
+      companionOptedOut = false;
       if(data?.roomId) setRoomId(data.roomId);
       setCompanionStatus(`In room: ${data.roomId}${membersSuffix(data)}`);
       companionSocket.emit("state:request", { roomId: data.roomId });
@@ -1953,10 +1977,10 @@
 
     companionSocket.on("room:left", ()=>{
       companionRoomJoined = false;
-      setCompanionStatus("Left room");
-    });
+    setCompanionStatus("Left room");
+  });
 
-    companionSocket.on("state:push", (payload)=>{
+  companionSocket.on("state:push", (payload)=>{
       try{
         if(!payload || !payload.state) return;
         state = loadState(payload.state);
@@ -1989,6 +2013,16 @@
 
   // push periodic timer sync while running
   setInterval(()=>{ if(state.timer.isRunning) pushTimerSync(); }, 1000);
+
+  // auto-rejoin watchdog (in case UI closes drawer or socket reconnects)
+  setInterval(()=>{
+    const p=activeProfile();
+    if(!p.companionOn || !p.roomId) return;
+    if(companionOptedOut) return;
+    if(companionSocket && companionSocket.connected && !companionRoomJoined){
+      joinRoomWithAck(companionSocket, p.roomId);
+    }
+  }, 4000);
 
   /* Palette */
   const paletteCommands = [
@@ -2066,36 +2100,6 @@
     const p=activeProfile();
     p.roomId=(t.value||"").trim();
     saveState();
-  });
-
-  // global fallback click handler for join/leave (guarded to avoid double-fire)
-  document.addEventListener("click",(e)=>{
-    const t=e.target;
-    if(!t || !t.id) return;
-
-    // If a panel bind already attached an onclick handler, don't double-fire here.
-    if((t.id==="joinRoomBtn" || t.id==="leaveRoomBtn") && typeof t.onclick==="function") return;
-
-    if(t.id==="joinRoomBtn"){
-      (async ()=>{
-        const p=activeProfile();
-        if(!p.roomId){ toast("Enter a room id."); return; }
-        const sock=await ensureCompanionSocket();
-        if(!sock) return;
-        sock.emit("room:join",{roomId:p.roomId});
-        setCompanionStatus("Connected");
-      })();
-    }
-    if(t.id==="leaveRoomBtn"){
-      (async ()=>{
-        const p=activeProfile();
-        if(!p.roomId){ return; }
-        const sock=await ensureCompanionSocket();
-        if(!sock) return;
-        sock.emit("room:leave",{roomId:p.roomId});
-        setCompanionStatus("Disconnected");
-      })();
-    }
   });
 
 })();
