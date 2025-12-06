@@ -387,6 +387,15 @@
 <div class="toast" id="toast"></div>
 
 <script>
+  /* Globals */
+  const STORAGE_KEY = "ultraPomodoroStateV10Dock";
+  const API_BASE = (()=>{
+    const stored = localStorage.getItem("ultraApiBase");
+    if(stored) return stored;
+    if(location.hostname.endsWith("github.io")) return "https://pmdr.onrender.com";
+    return location.origin;
+  })(); // backend base for Socket.IO + API
+
 // -------------------- Socket.IO client auto-loader --------------------
 (async function loadSocketIOClient(){
   function loadScript(src){
@@ -442,13 +451,6 @@
     {id:"totem", name:"Streak Totem", cost:3, effect:"Streak loss protection once/week"}
   ];
 
-  const STORAGE_KEY = "ultraPomodoroStateV10Dock";
-  const API_BASE = (()=>{
-    const stored = localStorage.getItem("ultraApiBase");
-    if(stored) return stored;
-    if(location.hostname.endsWith("github.io")) return "https://pmdr.onrender.com";
-    return location.origin;
-  })(); // backend base for Socket.IO + API
   const BLOCKING_AVAILABLE = (
     location.hostname === "localhost" ||
     location.hostname === "127.0.0.1" ||
@@ -2039,7 +2041,16 @@
     const p=activeProfile();
     if(!p.companionOn || !p.roomId) return;
     if(companionOptedOut) return;
-    if(companionSocket && companionSocket.connected && !companionRoomJoined){
+    // recreate socket if missing or disconnected
+    if(!companionSocket || !companionSocket.connected){
+      ensureCompanionSocket().then(sock=>{
+        if(sock && sock.connected && !companionRoomJoined){
+          joinRoomWithAck(sock, p.roomId);
+        }
+      });
+      return;
+    }
+    if(companionSocket.connected && !companionRoomJoined){
       joinRoomWithAck(companionSocket, p.roomId);
     }
   }, 4000);
