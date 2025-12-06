@@ -1927,8 +1927,10 @@
       transports: ["websocket"],              // mandatory for tunnel stability
       upgrade: false,
       reconnection: true,
-      reconnectionDelay: 600,
-      timeout: 8000
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 800,
+      reconnectionDelayMax: 5000,
+      timeout: 12000
     });
 
     companionSocket.on("connect", ()=>{
