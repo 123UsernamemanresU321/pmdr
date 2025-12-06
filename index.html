@@ -456,6 +456,7 @@
     location.hostname === "127.0.0.1" ||
     location.hostname.endsWith(".local")
   );
+  const SOUND_PREF_KEY = "ultraPomodoroSoundPrefs";
   const COMPANION_WARN_GHPAGES = location.hostname.includes("github.io");
   const $ = s => document.querySelector(s);
 
@@ -618,6 +619,37 @@
   /* Timer core */
   const FULL_DASH = 2*Math.PI*44;
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const soundPrefs = (()=>{ try{ return JSON.parse(localStorage.getItem(SOUND_PREF_KEY))||{tick:true, alert:true}; }catch{ return {tick:true, alert:true}; } })();
+  let audioCtx=null;
+
+  function ensureAudioCtx(){
+    if(audioCtx) return audioCtx;
+    try{
+      audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    }catch{}
+    return audioCtx;
+  }
+  function playBeep(freq=880, duration=0.08, gain=0.08){
+    const ctx=ensureAudioCtx(); if(!ctx) return;
+    if(ctx.state==="suspended") ctx.resume().catch(()=>{});
+    const osc=ctx.createOscillator();
+    const g=ctx.createGain();
+    osc.frequency.value=freq;
+    g.gain.value=gain;
+    osc.connect(g).connect(ctx.destination);
+    const now=ctx.currentTime;
+    osc.start(now);
+    osc.stop(now+duration);
+  }
+  function playTickSound(){
+    if(!soundPrefs.tick) return;
+    playBeep(880,0.05,0.07);
+  }
+  function playAlertSound(){
+    if(!soundPrefs.alert) return;
+    playBeep(660,0.09,0.12);
+    setTimeout(()=>playBeep(880,0.09,0.12),90);
+  }
   const format=sec=>{
     sec=Math.max(0,Math.round(sec));
     const m=Math.floor(sec/60), s=sec%60;
@@ -889,6 +921,7 @@
   async function onSessionComplete(){
     const t=state.timer, p=activeProfile();
     const plannedMins = Math.round(t.plannedSec/60);
+    playAlertSound();
 
     if(t.mode==="work"){
       p.stats.focusCompleted++;
@@ -972,6 +1005,13 @@
     const delta=(now - t.lastTick)/1000;
     t.lastTick=now;
     t.remainingSec-=delta;
+    const secLeft=Math.ceil(t.remainingSec);
+    if(t.isRunning && soundPrefs.tick){
+      if(lastTickSoundSec===null || secLeft!==lastTickSoundSec){
+        lastTickSoundSec=secLeft;
+        playTickSound();
+      }
+    }
 
     if(t.remainingSec<=0){
       t.remainingSec=0; t.isRunning=false; t.lastTick=null;
@@ -1697,34 +1737,43 @@
             </div>
           </div>
 
-          <div class="section">
-            <div class="muted">Companion Mode (sync rooms)</div>
-            <div class="tinyline">WebSocket-only. Accessing via Cloudflare tunnel link.</div>
+      <div class="section">
+        <div class="muted">Companion Mode (sync rooms)</div>
+        <div class="tinyline">WebSocket-only. Accessing via Cloudflare tunnel link.</div>
 
-            <label class="field">Companion Mode
+        <label class="field">Companion Mode
               <select id="companionOn">
                 <option value="off">Off</option>
                 <option value="on" ${p.companionOn?"selected":""}>On</option>
               </select>
             </label>
 
-            <div class="row">
-              <input id="roomId" placeholder="room id (e.g. bio-chem)" value="${p.roomId||""}" />
-              <button class="btn ghost" id="createRoomBtn">Create</button>
-              <button class="btn ghost" id="joinRoomBtn">Join</button>
-              <button class="btn ghost" id="leaveRoomBtn">Leave</button>
-              <span id="roomStatus" class="pill">Not connected</span>
-            </div>
-            <div class="tinyline">Create = start a room (auto generates if empty). Join = enter an existing room.</div>
-            ${COMPANION_WARN_GHPAGES ? `<div class="tinyline">On GitHub Pages you need server.py running somewhere reachable (Socket.IO) or Companion will show connection errors.</div>` : ""}
-            <label class="field">Backend URL
-              <input id="apiBaseIn" value="${API_BASE}" />
-            </label>
-            <div class="row" style="justify-content:flex-end;">
-              <button class="btn ghost" id="apiBaseSaveBtn">Save Backend URL</button>
-            </div>
-          </div>
-        `;
+        <div class="row">
+          <input id="roomId" placeholder="room id (e.g. bio-chem)" value="${p.roomId||""}" />
+          <button class="btn ghost" id="createRoomBtn">Create</button>
+          <button class="btn ghost" id="joinRoomBtn">Join</button>
+          <button class="btn ghost" id="leaveRoomBtn">Leave</button>
+          <span id="roomStatus" class="pill">Not connected</span>
+        </div>
+        <div class="tinyline">Create = start a room (auto generates if empty). Join = enter an existing room.</div>
+        ${COMPANION_WARN_GHPAGES ? `<div class="tinyline">On GitHub Pages you need server.py running somewhere reachable (Socket.IO) or Companion will show connection errors.</div>` : ""}
+        <label class="field">Backend URL
+          <input id="apiBaseIn" value="${API_BASE}" />
+        </label>
+        <div class="row" style="justify-content:flex-end;">
+          <button class="btn ghost" id="apiBaseSaveBtn">Save Backend URL</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="muted">Sounds</div>
+        <div class="row">
+          <label class="toggle" id="soundTickToggle" data-on="${soundPrefs.tick}">Tick each second</label>
+          <label class="toggle" id="soundAlertToggle" data-on="${soundPrefs.alert}">Alert on transition</label>
+        </div>
+        <div class="tinyline">Audio plays on user interaction (browser audio policies).</div>
+      </div>
+    `;
       },
       bind: ()=>{
         const p=activeProfile();
@@ -1773,6 +1822,19 @@
           localStorage.setItem("ultraApiBase", val);
           toast("Backend URL saved. Reload to apply.");
         };
+
+        const bindToggle=(id,key)=>{
+          const el=$(id);
+          if(!el) return;
+          el.onclick=()=>{
+            soundPrefs[key]=!soundPrefs[key];
+            el.dataset.on=soundPrefs[key];
+            localStorage.setItem(SOUND_PREF_KEY, JSON.stringify(soundPrefs));
+            toast(`${key==="tick"?"Tick":"Alert"} ${soundPrefs[key]?"On":"Off"}`);
+          };
+        };
+        bindToggle("#soundTickToggle","tick");
+        bindToggle("#soundAlertToggle","alert");
 
         const ensureRoomId=()=>{
           let rid = ($("#roomId")?.value||"").trim();
@@ -1868,6 +1930,7 @@
   let companionStatus="Off";
   const genRoomId=()=>`room-${Math.random().toString(36).slice(2,7)}`;
   let lastJoinAttempt=0;
+  let lastTickSoundSec=null;
 
   function companionEls(){
     return {
