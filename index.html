@@ -443,7 +443,12 @@
   ];
 
   const STORAGE_KEY = "ultraPomodoroStateV10Dock";
-  const API_BASE = "https://pmdr.onrender.com"; // change to your deployed server.py URL
+  const API_BASE = (()=>{
+    const stored = localStorage.getItem("ultraApiBase");
+    if(stored) return stored;
+    if(location.hostname.endsWith("github.io")) return "https://pmdr.onrender.com";
+    return location.origin;
+  })(); // backend base for Socket.IO + API
   const BLOCKING_AVAILABLE = (
     location.hostname === "localhost" ||
     location.hostname === "127.0.0.1" ||
@@ -1708,6 +1713,12 @@
             </div>
             <div class="tinyline">Create = start a room (auto generates if empty). Join = enter an existing room.</div>
             ${COMPANION_WARN_GHPAGES ? `<div class="tinyline">On GitHub Pages you need server.py running somewhere reachable (Socket.IO) or Companion will show connection errors.</div>` : ""}
+            <label class="field">Backend URL
+              <input id="apiBaseIn" value="${API_BASE}" />
+            </label>
+            <div class="row" style="justify-content:flex-end;">
+              <button class="btn ghost" id="apiBaseSaveBtn">Save Backend URL</button>
+            </div>
           </div>
         `;
       },
@@ -1750,6 +1761,13 @@
           }
           setCompanionStatus(p.companionOn ? "Idle":"Off");
           renderDrawerContent("tools");
+        };
+
+        $("#apiBaseSaveBtn").onclick=()=>{
+          const val = ($("#apiBaseIn")?.value||"").trim();
+          if(!val){ toast("Enter a backend URL."); return; }
+          localStorage.setItem("ultraApiBase", val);
+          toast("Backend URL saved. Reload to apply.");
         };
 
         const ensureRoomId=()=>{
@@ -1924,8 +1942,8 @@
 
     companionSocket = window.io(API_BASE, {     // point to hosted backend
       path: "/socket.io",
-      transports: ["websocket"],              // mandatory for tunnel stability
-      upgrade: false,
+      transports: ["websocket","polling"],    // allow polling fallback; websocket preferred
+      upgrade: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 800,
@@ -1979,8 +1997,8 @@
 
     companionSocket.on("room:left", ()=>{
       companionRoomJoined = false;
-    setCompanionStatus("Left room");
-  });
+      setCompanionStatus("Left room");
+    });
 
   companionSocket.on("state:push", (payload)=>{
       try{
