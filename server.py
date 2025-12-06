@@ -292,7 +292,7 @@ def new_room_id() -> str:
 def on_room_join(data):
     room_id = (data or {}).get("roomId", "").strip()
     if not room_id:
-        return
+        return {"ok": False, "error": "missing roomId"}
     join_room(room_id)
     emit("room:joined",
          {"roomId": room_id, "members": members_in(room_id)},
@@ -300,6 +300,7 @@ def on_room_join(data):
     emit("room:members",
          {"roomId": room_id, "members": members_in(room_id)},
          room=room_id)
+    return {"ok": True, "roomId": room_id, "members": members_in(room_id)}
 
 @socketio.on("room:create")
 def on_room_create(data):
@@ -311,16 +312,21 @@ def on_room_create(data):
     emit("room:members",
          {"roomId": room_id, "members": members_in(room_id)},
          room=room_id)
+    return {"ok": True, "roomId": room_id, "members": members_in(room_id)}
 
 @socketio.on("room:leave")
 def on_room_leave(data):
     room_id = (data or {}).get("roomId", "").strip()
     if not room_id:
-        return
+        return {"ok": False, "error": "missing roomId"}
     leave_room(room_id)
     emit("room:members",
          {"roomId": room_id, "members": members_in(room_id)},
          room=room_id)
+    emit("room:left",
+         {"roomId": room_id, "members": members_in(room_id)},
+         room=request.sid)
+    return {"ok": True, "roomId": room_id, "members": members_in(room_id)}
 
 @socketio.on("timer:sync")
 def on_timer_sync(data):
