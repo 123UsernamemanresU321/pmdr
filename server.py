@@ -20,18 +20,10 @@ are not intercepting DNS/hosts resolution.
 """
 
 # ---------------------------------------------------------------------------
-# EVENTLET MUST LOAD FIRST, AND HUB MUST BE SET BEFORE I/O
+# Async mode: use threading (compatible with Python 3.13 on Render)
 # ---------------------------------------------------------------------------
 import os
 import platform
-
-# Fix eventlet kqueue hub crash on macOS by forcing poll hub
-# (must be set before importing/initializing eventlet hubs). :contentReference[oaicite:1]{index=1}
-if platform.system().lower() == "darwin":
-    os.environ.setdefault("EVENTLET_HUB", "poll")
-
-import eventlet  # noqa: E402
-eventlet.monkey_patch()  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Standard imports after monkey_patch
@@ -63,7 +55,8 @@ HOSTS_TAG_END = "# === ULTRA_POMODORO_BLOCK_END ==="
 # App init
 # ---------------------------------------------------------------------------
 app = Flask(__name__, static_folder=None)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+# Use threading mode to avoid eventlet incompatibilities on Python 3.13.
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # ---------------------------------------------------------------------------
 # Utilities
