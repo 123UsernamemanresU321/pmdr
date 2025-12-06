@@ -960,6 +960,7 @@
     const ps=plannedSecFor(t.mode);
     t.plannedSec=ps; t.remainingSec=ps; t.isRunning=false; t.lastTick=null;
     p.stats.replay.push({ts:new Date().toISOString(), event:`advance:${t.mode}`});
+    pushTimerSync();
   }
 
   let raf=null;
@@ -1011,6 +1012,7 @@
     t.isRunning=true; t.lastTick=null;
     p.stats.replay.push({ts:new Date().toISOString(), event:`start:${t.mode}`});
     saveState(); renderTimer();
+    pushTimerSync();
     if(!raf) raf=requestAnimationFrame(tickLoop);
     if(t.mode==="work" && p.blockOn) applyHostsBlockFromProfile();
   }
@@ -1019,7 +1021,7 @@
     if(raf){ cancelAnimationFrame(raf); raf=null; }
     const t=state.timer; t.isRunning=false; t.lastTick=null;
     activeProfile().stats.replay.push({ts:new Date().toISOString(), event:`pause:${t.mode}`});
-    saveState(); renderTimer();
+    saveState(); renderTimer(); pushTimerSync();
   }
   function resetTimer(){
     if(raf){ cancelAnimationFrame(raf); raf=null; }
@@ -1027,7 +1029,7 @@
     t.isRunning=false; t.lastTick=null;
     const ps=plannedSecFor(t.mode); t.plannedSec=ps; t.remainingSec=ps;
     activeProfile().stats.replay.push({ts:new Date().toISOString(), event:`reset:${t.mode}`});
-    saveState(); renderTimer();
+    saveState(); renderTimer(); pushTimerSync();
   }
   function skipTimer(){
     const p=activeProfile();
@@ -1761,7 +1763,7 @@
             companionSocket.disconnect();
             companionSocket=null;
           }
-          setCompanionStatus(p.companionOn ? "Idle":"Off");
+          setCompanionStatus(p.companionOn ? companionStatus || "Idle":"Off");
           renderDrawerContent("tools");
         };
 
@@ -1823,9 +1825,8 @@
           );
         };
 
-        // initial status paint
-        setCompanionStatus(p.companionOn ? (companionSocket?.connected?"Connected":"Idle") : "Off");
-        if(statusEl()) statusEl().textContent = p.companionOn ? "Idle" : "Off";
+        // initial status paint (use last known status)
+        setCompanionStatus(p.companionOn ? companionStatus || (companionSocket?.connected?"Connected":"Idle") : "Off");
       }
     }
   };
@@ -1864,6 +1865,7 @@
   let companionRoomJoined=false;
   let companionWarned=false;
   let companionOptedOut=false;
+  let companionStatus="Off";
   const genRoomId=()=>`room-${Math.random().toString(36).slice(2,7)}`;
   let lastJoinAttempt=0;
 
@@ -1875,6 +1877,7 @@
   }
 
   function setCompanionStatus(txt){
+    companionStatus=txt;
     const { status } = companionEls();
     if(status) status.textContent = txt;
   }
@@ -1994,7 +1997,7 @@
       companionOptedOut = false;
       if(data?.roomId) setRoomId(data.roomId);
       setCompanionStatus(`In room: ${data.roomId}${membersSuffix(data)}`);
-      companionSocket.emit("state:request", { roomId: data.roomId });
+      companionSocket.emit("timer:request", { roomId: data.roomId });
     });
 
     companionSocket.on("room:left", ()=>{
@@ -2002,26 +2005,16 @@
       setCompanionStatus("Left room");
     });
 
-  companionSocket.on("state:push", (payload)=>{
-      try{
-        if(!payload || !payload.state) return;
-        state = loadState(payload.state);
-        saveState();
-        renderTimer();
-        if(drawer.classList.contains("show")){
-          const active = [...dock.children].find(b=>b.classList.contains("active"));
-          if(active) renderDrawerContent(active.dataset.panel);
-        }
-        toast("State synced.");
-      }catch(e){
-        console.warn("Bad state push", e);
-      }
-    });
-
-    companionSocket.on("timer:sync", (payload)=>{
+    companionSocket.on("timer:state", (payload)=>{
       if(!payload || !payload.timer) return;
       state.timer = {...state.timer, ...payload.timer};
       saveState(); renderTimer();
+    });
+
+    companionSocket.on("timer:request", (data)=>{
+      const p=activeProfile();
+      if(!companionRoomJoined || !p.companionOn) return;
+      pushTimerSync(); // respond with current timer
     });
 
     return companionSocket;
