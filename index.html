@@ -443,6 +443,11 @@
   ];
 
   const STORAGE_KEY = "ultraPomodoroStateV10Dock";
+  const BLOCKING_AVAILABLE = (
+    location.hostname === "localhost" ||
+    location.hostname === "127.0.0.1" ||
+    location.hostname.endsWith(".local")
+  );
   const $ = s => document.querySelector(s);
 
   function defaultProfile(name="Default"){
@@ -1101,9 +1106,13 @@
     }
   };
 
-  /* Website blocking (unchanged) */
+  /* Website blocking */
   const parseDomains=str=>str.split(",").map(s=>s.trim()).filter(Boolean);
   async function applyHostsBlock(domains){
+    if(!BLOCKING_AVAILABLE){
+      toast("Blocking needs the local server (run server.py with sudo).");
+      return false;
+    }
     try{
       toast("Applying hosts block…");
       const res=await fetch("/api/block/apply",{
@@ -1123,6 +1132,10 @@
     }
   }
   async function clearHostsBlock(){
+    if(!BLOCKING_AVAILABLE){
+      toast("Blocking needs the local server (run server.py with sudo).");
+      return;
+    }
     try{
       await fetch("/api/block/clear",{method:"POST"});
       toast("Hosts block cleared.");
@@ -1131,6 +1144,10 @@
     }
   }
   function applyHostsBlockFromProfile(){
+    if(!BLOCKING_AVAILABLE){
+      toast("Blocking unavailable here; start local server to enable.");
+      return;
+    }
     const p=activeProfile();
     if(!p.domains?.length) return;
     applyHostsBlock(p.domains);
@@ -1185,6 +1202,7 @@
     saveState(); renderQuickbar(); toast(`Strict ${p.strictOn?"On":"Off"}`);
   };
   qtBlock.onclick=()=>{
+    if(!BLOCKING_AVAILABLE){ toast("Blocking disabled on GitHub Pages; run server.py locally."); return; }
     const p=activeProfile();
     p.blockOn=!p.blockOn;
     saveState(); renderQuickbar();
@@ -1386,33 +1404,35 @@
       title:"Website Blocking",
       render: ()=>{
         const p=activeProfile();
+        const disabled = !BLOCKING_AVAILABLE ? "disabled" : "";
         return `
           <div class="section">
+            ${!BLOCKING_AVAILABLE ? `<div class="pill" style="background:color-mix(in oklab, var(--warn) 18%, transparent); border-color:color-mix(in oklab, var(--warn) 60%, transparent);">Unavailable on static deploy — run server.py locally (sudo) to enable</div>` : ""}
             <label class="field">Blocking
-              <select id="blockOnIn">
+              <select id="blockOnIn" ${disabled}>
                 <option value="off">Off</option>
                 <option value="on" ${p.blockOn?"selected":""}>On</option>
               </select>
             </label>
             <label class="field">Mode
-              <select id="blockModeIn">
+              <select id="blockModeIn" ${disabled}>
                 <option value="blacklist" ${p.blockMode==="blacklist"?"selected":""}>Blacklist</option>
                 <option value="whitelist" ${p.blockMode==="whitelist"?"selected":""}>Whitelist</option>
               </select>
             </label>
             <label class="field">Annoy mode
-              <select id="annoyOnIn">
+              <select id="annoyOnIn" ${disabled}>
                 <option value="on" ${p.annoyOn?"selected":""}>On</option>
                 <option value="off" ${!p.annoyOn?"selected":""}>Off</option>
               </select>
             </label>
             <label class="field">Domains (comma separated)
-              <textarea id="domainsIn">${(p.domains||[]).join(", ")}</textarea>
+              <textarea id="domainsIn" ${disabled}>${(p.domains||[]).join(", ")}</textarea>
             </label>
             <div class="row" style="justify-content:flex-end;">
-              <button class="btn primary" id="saveBlockBtnIn">Save Blocking</button>
-              <button class="btn ghost" id="applyHostsBtnIn">Apply Hosts Now</button>
-              <button class="btn danger" id="clearHostsBtnIn">Clear Hosts</button>
+              <button class="btn primary" id="saveBlockBtnIn" ${disabled}>Save Blocking</button>
+              <button class="btn ghost" id="applyHostsBtnIn" ${disabled}>Apply Hosts Now</button>
+              <button class="btn danger" id="clearHostsBtnIn" ${disabled}>Clear Hosts</button>
             </div>
           </div>
         `;
