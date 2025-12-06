@@ -42,6 +42,7 @@ import socket
 import subprocess
 import pathlib
 import re
+import secrets
 from typing import List, Tuple, Optional, Dict, Any
 
 from flask import Flask, request, jsonify, send_from_directory, make_response
@@ -284,12 +285,29 @@ def members_in(room_id: str) -> int:
     rooms = socketio.server.manager.rooms.get("/", {})
     return len(rooms.get(room_id, set()))
 
+def new_room_id() -> str:
+    return "room-" + secrets.token_hex(3)
+
 @socketio.on("room:join")
 def on_room_join(data):
     room_id = (data or {}).get("roomId", "").strip()
     if not room_id:
         return
     join_room(room_id)
+    emit("room:joined",
+         {"roomId": room_id, "members": members_in(room_id)},
+         room=request.sid)
+    emit("room:members",
+         {"roomId": room_id, "members": members_in(room_id)},
+         room=room_id)
+
+@socketio.on("room:create")
+def on_room_create(data):
+    room_id = (data or {}).get("roomId", "").strip() or new_room_id()
+    join_room(room_id)
+    emit("room:created",
+         {"roomId": room_id, "members": members_in(room_id)},
+         room=request.sid)
     emit("room:members",
          {"roomId": room_id, "members": members_in(room_id)},
          room=room_id)
